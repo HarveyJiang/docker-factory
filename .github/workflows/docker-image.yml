@@ -3,7 +3,13 @@ name: build-openchamber
 on:
   schedule:
     - cron: '0 0 15 * *'      # 每6小时检查一次
-  workflow_dispatch: {}        # 也支持手动触发
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force rebuild even if upstream unchanged'
+        required: false
+        default: 'false'
+        type: boolean
 
 env:
   REGISTRY: ghcr.io
@@ -26,7 +32,9 @@ jobs:
       - name: Check for updates
         id: check
         run: |
-          if [ -f LAST_BUILD ] && [ "$(cat LAST_BUILD)" = "${{ steps.upstream.outputs.sha }}" ]; then
+          if [ "${{ inputs.force }}" = "true" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -f LAST_BUILD ] && [ "$(cat LAST_BUILD)" = "${{ steps.upstream.outputs.sha }}" ]; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
