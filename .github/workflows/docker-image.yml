@@ -83,6 +83,27 @@ jobs:
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:main-${{ steps.upstream.outputs.sha }}
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.date.outputs.date }}
 
+      - name: Report image size
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          echo "=== Image Size Report ==="
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.date.outputs.date }} 2>&1
+          # 解析每个平台大小
+          SIZE_AMD64=$(docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.date.outputs.date }} --raw 2>/dev/null | \
+            python3 -c "
+          import json,sys
+          d=json.load(sys.stdin)
+          total=0
+          for m in d.get('manifests',[]):
+            s=m.get('size',0)
+            total+=s
+            plat=m.get('platform',{})
+            arch=plat.get('architecture','?')
+            print(f'  {arch}: {s/1024/1024:.1f}MB')
+          print(f'  Total manifest size: {total/1024/1024:.1f}MB')
+          " 2>/dev/null || echo "  (无法解析 manifest size)")
+          echo "=== End Report ==="
+
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'
         run: |
