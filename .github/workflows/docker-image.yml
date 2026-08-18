@@ -56,6 +56,10 @@ jobs:
         id: repo
         run: echo "name=${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
         
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
+
       - name: Build and push
         if: steps.check.outputs.skip == 'false'
         uses: docker/build-push-action@v6
@@ -67,6 +71,7 @@ jobs:
           tags: |
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:latest
             ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:main-${{ steps.upstream.outputs.sha }}
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.date.outputs.date }}
 
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'

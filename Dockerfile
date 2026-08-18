@@ -24,7 +24,9 @@ WORKDIR /home/openchamber
 RUN apt-get update && apt-get install -y --no-install-recommends \
   bash \
   ca-certificates \
+  curl \
   git \
+  jq \
   less \
   nodejs \
   npm \
@@ -32,6 +34,19 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   python3-pip \
   python3-requests \
+  unzip \
+  wget \
+  zip \
+  && rm -rf /var/lib/apt/lists/*
+
+# GitHub CLI (gh) via official apt repo - needed for GitHub Pages publishing,
+# repo management (gh repo create/api/release) and git push/pull over HTTPS.
+RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
+    | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
+  && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+  && apt-get update \
+  && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
 
 # Replace the base image's 'bun' user (UID 1000) with 'openchamber'
@@ -49,7 +64,7 @@ ENV PATH=${NPM_CONFIG_PREFIX}/bin:${PATH}
 
 RUN npm config set prefix /home/openchamber/.npm-global && mkdir -p /home/openchamber/.npm-global && \
   mkdir -p /home/openchamber/.local /home/openchamber/.config /home/openchamber/.ssh && \
-  npm install -g opencode-ai
+  npm install -g opencode-ai wrangler
 
 # cloudflared 2026.3.0 - update digest explicitly when upgrading
 COPY --from=cloudflare/cloudflared@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
