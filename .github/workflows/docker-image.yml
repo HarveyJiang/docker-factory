@@ -2,7 +2,7 @@ name: build-openchamber
 
 on:
   schedule:
-    - cron: '0 */6 * * *'      # 每6小时检查一次
+    - cron: '0 0 15 * *'      # 每6小时检查一次
   workflow_dispatch: {}        # 也支持手动触发
 
 env:
