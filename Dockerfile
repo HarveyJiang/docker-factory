@@ -74,6 +74,9 @@ USER openchamber
 
 ENV NPM_CONFIG_PREFIX=/home/openchamber/.npm-global
 ENV PATH=${NPM_CONFIG_PREFIX}/bin:${PATH}
+# wrangler caches under node_modules/.cache (root-owned) by default, which the
+# non-root user cannot write - redirect to the persistent .config volume.
+ENV WRANGLER_CACHE_DIR=/home/openchamber/.config/.wrangler/cache
 
 RUN npm config set prefix /home/openchamber/.npm-global && mkdir -p /home/openchamber/.npm-global && \
   mkdir -p /home/openchamber/.local /home/openchamber/.config /home/openchamber/.ssh && \
