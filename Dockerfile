@@ -28,8 +28,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   git \
   jq \
   less \
-  nodejs \
-  npm \
   openssh-client \
   python3 \
   python3-pip \
@@ -48,6 +46,15 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && apt-get update \
   && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
+
+# Latest Node LTS - apt's nodejs is stale (v20) and wrangler (Cloudflare Workers/Pages)
+# requires Node >=22. Bump node_ver here to upgrade later.
+RUN node_ver="v24.19.0" \
+  && node_arch="$(case "$(dpkg --print-architecture)" in amd64) echo x64;; arm64) echo arm64;; esac)" \
+  && curl -fsSL -o /tmp/node.tar.gz "https://nodejs.org/dist/${node_ver}/node-${node_ver}-linux-${node_arch}.tar.gz" \
+  && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
+  && rm -f /tmp/node.tar.gz \
+  && node --version && npm --version
 
 # Replace the base image's 'bun' user (UID 1000) with 'openchamber'
 # so mounted volumes with 1000:1000 ownership work correctly.
