@@ -13,6 +13,14 @@ COPY packages/vscode/package.json ./packages/vscode/
 COPY packages/mobile/package.json ./packages/mobile/
 RUN bun install --frozen-lockfile --ignore-scripts
 
+# Runtime production deps only. The full install pulls in devDependencies for
+# electron/vscode/mobile packages (electron-builder, vite, typescript, oxlint,
+# vsce-sign, ...) that are several hundred MB and never used at runtime.
+# Pruning them keeps the shipped image ~0.5-0.7 GB smaller.
+FROM deps AS prod-deps
+WORKDIR /app
+RUN bun install --frozen-lockfile --ignore-scripts --production
+
 FROM deps AS builder
 WORKDIR /app
 COPY . .
@@ -80,7 +88,8 @@ ENV WRANGLER_CACHE_DIR=/home/openchamber/.config/.wrangler/cache
 
 RUN npm config set prefix /home/openchamber/.npm-global && mkdir -p /home/openchamber/.npm-global && \
   mkdir -p /home/openchamber/.local /home/openchamber/.config /home/openchamber/.ssh && \
-  npm install -g opencode-ai wrangler
+  npm install -g --cache /tmp/npm-cache opencode-ai wrangler && \
+  rm -rf /tmp/npm-cache /home/openchamber/.npm
 
 # cloudflared 2026.3.0 - update digest explicitly when upgrading
 COPY --from=cloudflare/cloudflared@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
@@ -89,8 +98,8 @@ ENV NODE_ENV=production
 
 COPY scripts/docker-entrypoint.sh /home/openchamber/openchamber-entrypoint.sh
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/packages/web/node_modules ./packages/web/node_modules
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/packages/web/package.json ./packages/web/package.json
 COPY --from=builder /app/packages/web/bin ./packages/web/bin
