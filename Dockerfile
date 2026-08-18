@@ -16,9 +16,16 @@ RUN bun install --frozen-lockfile --ignore-scripts
 # Runtime production deps only. The full install pulls in devDependencies for
 # electron/vscode/mobile packages (electron-builder, vite, typescript, oxlint,
 # vsce-sign, ...) that are several hundred MB and never used at runtime.
-# Pruning them keeps the shipped image ~0.5-0.7 GB smaller.
-FROM deps AS prod-deps
+# Start fresh from base (no node_modules) so bun only installs production deps.
+FROM base AS prod-deps
 WORKDIR /app
+COPY package.json bun.lock ./
+COPY bun-patches ./bun-patches
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/web/package.json ./packages/web/
+COPY packages/electron/package.json ./packages/electron/
+COPY packages/vscode/package.json ./packages/vscode/
+COPY packages/mobile/package.json ./packages/mobile/
 RUN bun install --frozen-lockfile --ignore-scripts --production
 
 FROM deps AS builder
