@@ -32,6 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   python3-pip \
   python3-requests \
+  tzdata \
   unzip \
   wget \
   zip \
@@ -55,6 +56,11 @@ RUN node_ver="v24.19.0" \
   && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
   && rm -f /tmp/node.tar.gz \
   && node --version && npm --version
+
+# Use Beijing time (UTC+8) for the container's clock and TZ env
+ENV TZ=Asia/Shanghai
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+  && echo "Asia/Shanghai" > /etc/timezone
 
 # Replace the base image's 'bun' user (UID 1000) with 'openchamber'
 # so mounted volumes with 1000:1000 ownership work correctly.
