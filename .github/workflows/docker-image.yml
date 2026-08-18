@@ -90,30 +90,10 @@ jobs:
           echo "           IMAGE SIZE REPORT"
           echo "============================================"
           IMAGE="${{ env.REGISTRY }}/${{ steps.repo.outputs.name }}:${{ steps.date.outputs.date }}"
-          TOKEN=$(curl -s "https://ghcr.io/token?scope=repository:${{ steps.repo.outputs.name }}:pull" | python3 -c "import json,sys; print(json.load(sys.stdin)['token'])")
-          # 获取 manifest index
-          INDEX=$(curl -s -H "Authorization: Bearer $TOKEN" -H "Accept: application/vnd.oci.image.index.v1+json" "https://ghcr.io/v2/${{ steps.repo.outputs.name }}/manifests/${{ steps.date.outputs.date }}")
-          echo "$INDEX" | python3 -c "
-        import json,sys
-        d=json.load(sys.stdin)
-        total=0
-        platforms=d.get('manifests',[])
-        if not platforms:
-            print('  No manifests found')
-            sys.exit(0)
-        for m in platforms:
-            s=m.get('size',0)
-            total+=s
-            plat=m.get('platform',{})
-            arch=plat.get('architecture','?')
-            variant=plat.get('variant','')
-            label=f'{arch}' + (f'/{variant}' if variant else '')
-            print(f'  {label:12s} {s/1024/1024:>8.1f} MB')
-        print('  ─────────────────────────────────')
-        print(f'  Total        {total/1024/1024:>8.1f} MB')
-        print('============================================')
-        "
+          docker buildx imagetools inspect "$IMAGE" 2>&1
+          echo "============================================"
           echo "Image: $IMAGE"
+          echo "============================================"
 
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'
