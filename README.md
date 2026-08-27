@@ -39,6 +39,61 @@ docker run -it --rm -p 3000:3000 ghcr.io/harveyjiang/deepseek-harness web
 
 ---
 
+## 🐳 Compose 一键运行示例
+
+> 每个镜像目录均提供可直接复制的 `compose.yml` + `.env.example`，对照源码环境变量注释，开箱即用
+
+### OpenChamber
+
+```bash
+# 1. 复制 compose 与环境变量模板
+cp images/openchamber/compose.yml ./compose.yml
+cp images/openchamber/.env.example ./.env
+
+# 2. 生成随机密码（必填）
+# macOS/Linux
+echo "OPENCHAMBER_UI_PASSWORD=$(openssl rand -base64 24)" >> .env
+# 或手动编辑 .env 填入 OPENCHAMBER_UI_PASSWORD
+
+# 3. 一键启动
+docker compose up -d
+docker compose logs -f
+
+# 访问 http://localhost:3000，输入 .env 中的密码
+# 常用环境变量（见 compose.yml 注释）：
+# OPENCHAMBER_TUNNEL_PROVIDER=cloudflare OPENCHAMBER_TUNNEL_MODE=quick
+# OH_MY_OPENCODE=true  OPENCODE_HOST=http://172.17.0.1:4096
+```
+
+**对应源码：** `btriapitsyn/openchamber:docker-compose.yml` + `scripts/docker-entrypoint.sh`
+
+### DeepSeek Harness
+
+```bash
+# 1. 复制
+cp images/deepseek-harness/compose.yml ./compose.yml
+cp images/deepseek-harness/.env.example ./.env  # 可选，无必填项
+
+# 2. 启动（默认 dsh web --help 验证，正常改为 web）
+docker compose up -d
+# 修改 compose.yml command 为 ["web"] 后重建
+# sed -i 's/\["web", "--help"\]/["web"]/' compose.yml && docker compose up -d
+
+docker compose logs -f
+# curl http://localhost:3000
+# 更多: docker exec -it deepseek-harness pnpm dsh --help
+```
+
+**对应源码：** `deepseek-ai/deepseek-harness:scripts/client-build-environment.ts` + `apps/cli`，`DSH_CLIENT_TITLE / DSH_WEB_PORT` 等
+
+### 工厂统一约定
+
+- 所有 `compose.yml` 使用 `ghcr.io/harveyjiang/<image>:latest`，每周自动更新
+- 持久化卷统一 `./data/<name>`，`extra_hosts: host.docker.internal` 支持宿主机 MySQL（如 `10.0.0.166:3306`）
+- 健康检查 `curl -f http://localhost:3000` 已内置
+
+---
+
 ## 📁 目录结构
 
 ```
