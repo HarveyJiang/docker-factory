@@ -1,0 +1,55 @@
+# DeepSeek Harness - docker compose 直接运行
+# 上游: https://github.com/deepseek-ai/deepseek-harness (pnpm + Node24)
+# 镜像: ghcr.io/harveyjiang/deepseek-harness:latest (Base+App 双层，每周巡检)
+# 使用: 复制本文件到任意目录，docker compose up -d 后访问 http://localhost:3000
+
+services:
+  deepseek-harness:
+    image: ghcr.io/harveyjiang/deepseek-harness:latest
+    container_name: deepseek-harness
+    ports:
+      - "3000:3000"  # dsh web 默认端口，如不同请改 DSH_WEB_PORT
+    volumes:
+      # 持久化：用户插件、会话、配置
+      - ./data/dsh-home:/home/node/.dsh
+      - ./data/dsh-workspace:/app/workspace
+      # 如需挂载本地插件开发目录
+      # - ./my-plugin:/app/my-plugin:ro
+    environment:
+      # ===== 基础 =====
+      TZ: Asia/Shanghai
+      NODE_ENV: production
+
+      # ===== DSH 官方环境变量（对照源码 scripts/client-build-environment.ts + apps/cli）=====
+      # Web 前端标题（可选）
+      # DSH_CLIENT_TITLE: "My DSH"
+
+      # 构建档案（build 时写入，运行无需改）
+      # DSH_BUILD_CLIENT_PROFILE: official  # official | 默认
+      # DSH_CLIENT_COMMIT_HASH: auto  # 镜像构建时已注入
+
+      # dsh web 额外参数（通过 command 传递，此处仅 env）
+      # DSH_WEB_PORT: 3000  # 如 dsh web 支持 --port，可在 command 中指定
+      # DSH_LOG_LEVEL: info  # debug | info | warn
+
+      # Python SDK 相关（如使用 python 插件）
+      # PYTHONPATH: /app/python/sdk
+
+    # 默认启动 dsh web，可覆盖
+    # 对照源码：apps/cli bin=dsh, web 为 --profile web 别名
+    command: ["web", "--help"]  # 首次验证用 --help，正常运行改为 ["web"] 或 ["web", "--port", "3000"]
+    # 健康检查
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+
+  # 可选：Python 侧车（如需独立 Python 环境运行 SDK）
+  # python-sdk:
+  #   image: ghcr.io/harveyjiang/deepseek-harness:latest
+  #   command: ["python", "-m", "dsh_sdk", "--help"]
+  #   volumes:
+  #     - ./data/dsh-workspace:/app/workspace

@@ -1,0 +1,63 @@
+# OpenChamber - docker compose 直接运行
+# 上游: https://github.com/btriapitsyn/openchamber
+# 镜像: ghcr.io/harveyjiang/openchamber:latest (Base+App 双层，每周巡检)
+# 使用: 复制本文件到任意目录，修改 .env 后 docker compose up -d
+
+services:
+  openchamber:
+    image: ghcr.io/harveyjiang/openchamber:latest
+    container_name: openchamber
+    ports:
+      - "3000:3000"  # Web UI
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # 持久化目录（宿主机 ./data/* 自动创建）
+      - ./data/openchamber:/home/openchamber/.config/openchamber
+      - ./data/opencode/share:/home/openchamber/.local/share/opencode
+      - ./data/opencode/state:/home/openchamber/.local/state/opencode
+      - ./data/opencode/config:/home/openchamber/.config/opencode
+      - ./data/ssh:/home/openchamber/.ssh
+      - ./workspaces:/home/openchamber/workspaces
+    environment:
+      # ===== 必填 =====
+      # Docker 绑定到 0.0.0.0，需设置 UI 密码（启动前生成）
+      # 生成: openssl rand -base64 24
+      OPENCHAMBER_UI_PASSWORD: ${OPENCHAMBER_UI_PASSWORD:?请先设置密码}
+
+      # ===== 选填（对照源码 scripts/docker-entrypoint.sh + docker-compose.yml）=====
+      # 绑定地址（Docker 内默认 0.0.0.0，无需改）
+      # OPENCHAMBER_HOST: 0.0.0.0
+
+      # 私有中继 / 隧道（可选，暴露外网访问）
+      # OPENCHAMBER_TUNNEL_PROVIDER: cloudflare  # cloudflare | ngrok
+      # OPENCHAMBER_TUNNEL_MODE: quick           # quick | managed-remote | managed-local
+      # OPENCHAMBER_TUNNEL_HOSTNAME: app.example.com  # managed-remote 必填
+      # OPENCHAMBER_TUNNEL_TOKEN: your_cloudflare_token  # managed-remote 必填
+      # OPENCHAMBER_TUNNEL_CONFIG: /home/openchamber/.cloudflared/config.yml  # managed-local 可选
+
+      # oh-my-opencode 增强（可选）
+      # OH_MY_OPENCODE: "true"  # 首次启动自动安装 oh-my-opencode
+
+      # 外置 OpenCode 服务（可选）
+      # OPENCODE_HOST: http://172.17.0.1:4096
+      # OPENCODE_SKIP_START: "true"
+      # OPENCHAMBER_OPENCODE_HOSTNAME: 0.0.0.0
+
+      # 时区（已在镜像内默认 Asia/Shanghai）
+      TZ: Asia/Shanghai
+
+      # ===== 本工厂扩展（Java/Python 开发）=====
+      # Java 21 + Maven + Python3 已预装，无需额外环境变量
+      # 如需在容器内开发 beike 等 Java 项目，直接 exec 进入即可
+      # docker exec -it openchamber bash
+      # mvn -v && java -version && python3 --version
+
+    restart: unless-stopped
+    # 健康检查（可选）
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
