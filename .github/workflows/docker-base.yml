@@ -1,0 +1,55 @@
+name: build-base
+
+on:
+  push:
+    paths:
+      - "Dockerfile.base"
+      - ".github/workflows/docker-base.yml"
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  build-base:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU and Buildx
+        uses: docker/setup-qemu-action@v4
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Lowercase repo owner
+        id: repo
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push base image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: ./Dockerfile.base
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/openchamber-docker-base:cache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/openchamber-docker-base:cache,mode=max
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/openchamber-docker-base:latest
+            ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/openchamber-docker-base:${{ github.sha }}
+
+      - name: Report base image
+        run: |
+          echo "Base image built: ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/openchamber-docker-base:latest"
+          docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/openchamber-docker-base:latest" 2>&1 | head -30
