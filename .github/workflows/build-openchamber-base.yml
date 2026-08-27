@@ -43,14 +43,29 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
-      - name: Report image size
+      - name: Report image size (human-readable)
         run: |
-          echo "### 📦 Image Size Report (with Size column)" >> $GITHUB_STEP_SUMMARY
+          IMAGE="${{ env.IMAGE }}:latest"
+          echo "### 📦 Image Size (human-readable)" >> $GITHUB_STEP_SUMMARY
           echo "| Image | Size |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
-          IMAGE="${{ env.IMAGE }}:latest"
-          # 轻量获取大小（无需 pull，避免 manifest list 拉取慢）
-          SIZE=$(docker buildx imagetools inspect "$IMAGE" --raw 2>&1 | wc -c | xargs -I{} echo "{} bytes (manifest)"; docker buildx imagetools inspect "$IMAGE" 2>&1 | grep -i "Size" | head -1 || echo "see imagetools")
+          docker pull "$IMAGE" --quiet || true
+          SIZE=$(docker images "$IMAGE" --format "{{.Size}}" | head -1)
+          if [ -z "$SIZE" ]; then SIZE=$(docker buildx imagetools inspect "$IMAGE" 2>&1 | grep -i "Size" | head -1 || echo "unknown"); fi
+          # 人类可读已由 docker images 直接给出如 1.42GB，无需 1609 bytes 换算
           echo "| \`$IMAGE\` | **$SIZE** |" >> $GITHUB_STEP_SUMMARY
-          echo "Image: $IMAGE Size: $SIZE"
+          echo "Image $IMAGE Size: $SIZE"
           docker buildx imagetools inspect "$IMAGE" 2>&1 | head -60
+      - name: Save image to Artifacts
+        run: |
+          IMAGE="${{ env.IMAGE }}:latest"
+          docker pull "$IMAGE" --quiet || true
+          docker save "$IMAGE" -o /tmp/image.tar
+          ls -lh /tmp/image.tar
+          echo "Saved $(du -h /tmp/image.tar | cut -f1) to /tmp/image.tar"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.IMAGE }}-${{ github.sha }}.tar
+          path: /tmp/image.tar
+          retention-days: 3
+          compression-level: 0

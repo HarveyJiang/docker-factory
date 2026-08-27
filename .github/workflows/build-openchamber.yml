@@ -78,23 +78,37 @@ jobs:
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:main-${{ steps.upstream.outputs.sha }}
             ${{ env.IMAGE }}:${{ steps.date.outputs.date }}
-      - name: Report image size
+
+      - name: Report image size (human-readable)
         if: steps.check.outputs.skip == 'false'
         run: |
-          echo "### 📦 Image Size Report (with Size column)" >> $GITHUB_STEP_SUMMARY
+          echo "### 📦 Image Size (human-readable)" >> $GITHUB_STEP_SUMMARY
           echo "| Image | Size | Tag |" >> $GITHUB_STEP_SUMMARY
           echo "|-------|------|-----|" >> $GITHUB_STEP_SUMMARY
-          for TAG in "latest" "${{ steps.date.outputs.date }}" "main-${{ steps.upstream.outputs.sha }}"; do
-            # deepseek 使用 master- 前缀，此处兼容两种，失败则跳过
+          for TAG in "latest" "${{ steps.date.outputs.date }}"; do
             IMAGE="${{ env.IMAGE }}:$TAG"
-            ALT_IMAGE="${{ env.IMAGE }}:master-${{ steps.upstream.outputs.sha }}"
-            if ! docker buildx imagetools inspect "$IMAGE" >/dev/null 2>&1; then IMAGE="$ALT_IMAGE"; fi
-            RAW_SIZE=$(docker buildx imagetools inspect "$IMAGE" --raw 2>&1 | wc -c)
-            echo "| \`$IMAGE\` | **${RAW_SIZE} bytes (manifest)** | \`$TAG\` |" >> $GITHUB_STEP_SUMMARY
-            echo "Image $IMAGE manifest size: ${RAW_SIZE} bytes"
+            docker pull "$IMAGE" --quiet || true
+            SIZE=$(docker images "$IMAGE" --format "{{.Size}}" | head -1)
+            if [ -z "$SIZE" ]; then SIZE="manifest-list"; fi
+            echo "| \`$IMAGE\` | **$SIZE** | \`$TAG\` |" >> $GITHUB_STEP_SUMMARY
+            echo "Image $IMAGE Size: $SIZE"
           done
-          docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.date.outputs.date }}" 2>&1 | head -60 || docker buildx imagetools inspect "${{ env.IMAGE }}:latest" 2>&1 | head -60
-
+          docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.date.outputs.date }}" 2>&1 | head -60 || true
+      - name: Save image to Artifacts
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          IMAGE="${{ env.IMAGE }}:latest"
+          docker pull "$IMAGE" --quiet || true
+          docker save "$IMAGE" -o /tmp/image-latest.tar
+          ls -lh /tmp/image-latest.tar
+          echo "Saved $(du -h /tmp/image-latest.tar | cut -f1)"
+      - uses: actions/upload-artifact@v4
+        if: steps.check.outputs.skip == 'false'
+        with:
+          name: image-latest-${{ steps.date.outputs.date }}.tar
+          path: /tmp/image-latest.tar
+          retention-days: 3
+          compression-level: 0
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'
         run: |
