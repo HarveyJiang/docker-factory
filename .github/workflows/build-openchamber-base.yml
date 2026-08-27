@@ -43,3 +43,14 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
+      - name: Report image size
+        run: |
+          IMAGE="${{ env.IMAGE }}:latest"
+          echo "### 📦 Image Size Report (with Size column)" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Size | Digest |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|--------|" >> $GITHUB_STEP_SUMMARY
+          docker pull "$IMAGE" --quiet || true
+          SIZE=$(docker images "$IMAGE" --format "{{.Size}}" | head -1)
+          echo "| \`$IMAGE\` | **$SIZE** | \`latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "Image: $IMAGE Size: $SIZE"
+          docker buildx imagetools inspect "$IMAGE" 2>&1 | head -40

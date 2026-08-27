@@ -78,11 +78,21 @@ jobs:
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:master-${{ steps.upstream.outputs.sha }}
             ${{ env.IMAGE }}:${{ steps.date.outputs.date }}
-      - name: Report image
+      - name: Report image size
         if: steps.check.outputs.skip == 'false'
         run: |
-          IMAGE="${{ env.IMAGE }}:${{ steps.date.outputs.date }}"
-          docker buildx imagetools inspect "$IMAGE" 2>&1 | head -40
+          echo "### 📦 Image Size Report (with Size column)" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Size | Tag |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|-----|" >> $GITHUB_STEP_SUMMARY
+          for TAG in "latest" "${{ steps.date.outputs.date }}" "master-${{ steps.upstream.outputs.sha }}"; do
+            IMAGE="${{ env.IMAGE }}:$TAG"
+            docker pull "$IMAGE" --quiet || true
+            SIZE=$(docker images "$IMAGE" --format "{{.Size}}" | head -1)
+            if [ -z "$SIZE" ]; then SIZE="manifest-list"; fi
+            echo "| \`$IMAGE\` | **$SIZE** | \`$TAG\` |" >> $GITHUB_STEP_SUMMARY
+            echo "Image $IMAGE Size: $SIZE"
+          done
+          docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.date.outputs.date }}" 2>&1 | head -40
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'
         run: |
