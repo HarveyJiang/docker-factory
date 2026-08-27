@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1.6
 FROM oven/bun:1.3.14 AS base
 WORKDIR /app
 
@@ -30,8 +30,12 @@ RUN bun install --frozen-lockfile --ignore-scripts --production
 
 FROM deps AS builder
 WORKDIR /app
+# 利用 BuildKit cache + 层缓存：web 未变更时直接命中缓存，变更时增量编译
 COPY . .
-RUN bun run build:web
+RUN --mount=type=cache,target=/root/.cache \
+    --mount=type=cache,target=/app/node_modules/.cache \
+    --mount=type=cache,target=/app/packages/web/node_modules/.vite \
+    bun run build:web
 
 # Runtime: 使用预构建的基础镜像（包含 Java/Maven/Python/Node/gh 等重依赖）
 # 基础镜像由 Dockerfile.base 构建，推送到 ghcr.io/harveyjiang/openchamber-docker-base
