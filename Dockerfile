@@ -36,6 +36,7 @@ RUN bun run build:web
 FROM oven/bun:1.3.14 AS runtime
 WORKDIR /home/openchamber
 
+# Install all system packages in one layer to reduce image size and build time
 RUN apt-get update && apt-get install -y --no-install-recommends \
   bash \
   ca-certificates \
@@ -52,7 +53,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   unzip \
   wget \
   zip \
-  # Java (OpenJDK 17) and Maven
   openjdk-17-jdk \
   maven \
   && rm -rf /var/lib/apt/lists/*
@@ -63,8 +63,7 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
     | dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg \
   && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
-  && apt-get update \
-  && apt-get install -y --no-install-recommends gh \
+  && apt-get update && apt-get install -y --no-install-recommends gh \
   && rm -rf /var/lib/apt/lists/*
 
 # Latest Node LTS - apt's nodejs is stale (v20) and wrangler (Cloudflare Workers/Pages)
