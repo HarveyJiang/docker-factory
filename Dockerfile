@@ -47,10 +47,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   python3 \
   python3-pip \
   python3-requests \
+  python3-venv \
   tzdata \
   unzip \
   wget \
   zip \
+  # Java (OpenJDK 17) and Maven
+  openjdk-17-jdk \
+  maven \
   && rm -rf /var/lib/apt/lists/*
 
 # GitHub CLI (gh) via official apt repo - needed for GitHub Pages publishing,
