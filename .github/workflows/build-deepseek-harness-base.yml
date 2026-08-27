@@ -45,12 +45,12 @@ jobs:
             ${{ env.IMAGE }}:${{ github.sha }}
       - name: Report image size
         run: |
-          IMAGE="${{ env.IMAGE }}:latest"
           echo "### 📦 Image Size Report (with Size column)" >> $GITHUB_STEP_SUMMARY
-          echo "| Image | Size | Digest |" >> $GITHUB_STEP_SUMMARY
-          echo "|-------|------|--------|" >> $GITHUB_STEP_SUMMARY
-          docker pull "$IMAGE" --quiet || true
-          SIZE=$(docker images "$IMAGE" --format "{{.Size}}" | head -1)
-          echo "| \`$IMAGE\` | **$SIZE** | \`latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Size |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|" >> $GITHUB_STEP_SUMMARY
+          IMAGE="${{ env.IMAGE }}:latest"
+          # 轻量获取大小（无需 pull，避免 manifest list 拉取慢）
+          SIZE=$(docker buildx imagetools inspect "$IMAGE" --raw 2>&1 | wc -c | xargs -I{} echo "{} bytes (manifest)"; docker buildx imagetools inspect "$IMAGE" 2>&1 | grep -i "Size" | head -1 || echo "see imagetools")
+          echo "| \`$IMAGE\` | **$SIZE** |" >> $GITHUB_STEP_SUMMARY
           echo "Image: $IMAGE Size: $SIZE"
-          docker buildx imagetools inspect "$IMAGE" 2>&1 | head -40
+          docker buildx imagetools inspect "$IMAGE" 2>&1 | head -60
