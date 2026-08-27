@@ -1,0 +1,24 @@
+# syntax=docker/dockerfile:1.6
+# DeepSeek Harness 基础镜像：Node24 + pnpm + Python 公共层
+# 每周巡检一次，上游不变则不重建，App 层可秒级拉取
+FROM node:24-bookworm
+
+RUN corepack enable && corepack prepare pnpm@11.7.0 --activate \
+  && node --version && pnpm --version
+
+# Python + 常用工具（harness 有 python sdk，运行时需要 git/curl）
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  git \
+  python3 \
+  python3-pip \
+  tzdata \
+  bash \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Asia/Shanghai
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+  && echo "Asia/Shanghai" > /etc/timezone
+
+ENV NODE_ENV=production

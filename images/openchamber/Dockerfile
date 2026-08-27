@@ -38,9 +38,8 @@ RUN --mount=type=cache,target=/root/.cache \
     bun run build:web
 
 # Runtime: 使用预构建的基础镜像（包含 Java/Maven/Python/Node/gh 等重依赖）
-# 基础镜像由 Dockerfile.base 构建，推送到 ghcr.io/harveyjiang/openchamber-docker-base
-# 优势：应用层构建只需 30s 左右，无需每次重装 apt 包
-FROM ghcr.io/harveyjiang/openchamber-docker-base:latest AS runtime
+# 基础镜像由 images/openchamber/Dockerfile.base 构建，每周一自动更新
+FROM ghcr.io/harveyjiang/openchamber-base:latest AS runtime
 WORKDIR /home/openchamber
 # 基础镜像已包含所有系统依赖，此处仅继承环境变量和用户
 # 如需本地无网络构建，可回退为: FROM oven/bun:1.3.14 AS runtime + 手动安装

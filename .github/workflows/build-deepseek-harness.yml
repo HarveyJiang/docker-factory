@@ -2,7 +2,12 @@ name: build-deepseek-harness
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 每天 02:00 UTC 检查上游
+    - cron: '0 3 * * 1'  # 每周一 03:00 UTC
+  push:
+    paths:
+      - "images/deepseek-harness/Dockerfile"
+      - ".github/workflows/build-deepseek-harness.yml"
+    branches: [main]
   workflow_dispatch:
     inputs:
       force:
@@ -13,6 +18,7 @@ on:
 
 env:
   REGISTRY: ghcr.io
+  IMAGE: ghcr.io/harveyjiang/deepseek-harness
   UPSTREAM_REPO: https://github.com/deepseek-ai/deepseek-harness.git
   UPSTREAM_BRANCH: master
 
@@ -24,29 +30,21 @@ jobs:
       packages: write
     steps:
       - uses: actions/checkout@v5
-
       - name: Get upstream HEAD
         id: upstream
         run: echo "sha=$(git ls-remote $UPSTREAM_REPO refs/heads/$UPSTREAM_BRANCH | cut -f1)" >> "$GITHUB_OUTPUT"
-
       - name: Check for updates
         id: check
         run: |
-          LAST_FILE="LAST_BUILD_DSH"
-          if [ "${{ inputs.force }}" = "true" ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          elif [ -f "$LAST_FILE" ] && [ "$(cat $LAST_FILE)" = "${{ steps.upstream.outputs.sha }}" ]; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
+          if [ "${{ inputs.force }}" = "true" ]; then echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -f LAST_BUILD_DSH ] && [ "$(cat LAST_BUILD_DSH)" = "${{ steps.upstream.outputs.sha }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"
+          else echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
-
-      - name: Clone upstream and apply custom Dockerfile
+      - name: Clone upstream and apply Dockerfile
         if: steps.check.outputs.skip == 'false'
         run: |
           git clone --depth 1 --branch $UPSTREAM_BRANCH $UPSTREAM_REPO src
-          cp Dockerfile.dsh src/Dockerfile
-
+          cp images/deepseek-harness/Dockerfile src/Dockerfile
       - name: Login to GHCR
         if: steps.check.outputs.skip == 'false'
         uses: docker/login-action@v4
@@ -54,23 +52,15 @@ jobs:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Set up QEMU and Buildx
         if: steps.check.outputs.skip == 'false'
         uses: docker/setup-qemu-action@v4
-
       - uses: docker/setup-buildx-action@v4
         if: steps.check.outputs.skip == 'false'
-
-      - name: Lowercase repo owner
-        id: repo
-        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
-
       - name: Get current date
         id: date
         run: echo "date=$(date +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-
-      - name: Build and push DeepSeek Harness
+      - name: Build and push
         if: steps.check.outputs.skip == 'false'
         uses: docker/build-push-action@v7
         with:
@@ -79,22 +69,20 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           cache-from: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:cache
+            type=registry,ref=${{ env.IMAGE }}:cache
             type=gha
           cache-to: |
-            type=registry,ref=${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:cache,mode=max
+            type=registry,ref=${{ env.IMAGE }}:cache,mode=max
             type=gha,mode=max
           tags: |
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:latest
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:master-${{ steps.upstream.outputs.sha }}
-            ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:${{ steps.date.outputs.date }}
-
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:master-${{ steps.upstream.outputs.sha }}
+            ${{ env.IMAGE }}:${{ steps.date.outputs.date }}
       - name: Report image
         if: steps.check.outputs.skip == 'false'
         run: |
-          echo "Image: ${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:${{ steps.date.outputs.date }}"
-          docker buildx imagetools inspect "${{ env.REGISTRY }}/${{ steps.repo.outputs.owner }}/deepseek-harness:${{ steps.date.outputs.date }}" 2>&1 | head -40
-
+          IMAGE="${{ env.IMAGE }}:${{ steps.date.outputs.date }}"
+          docker buildx imagetools inspect "$IMAGE" 2>&1 | head -40
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'
         run: |
@@ -104,4 +92,4 @@ jobs:
           git add LAST_BUILD_DSH
           git commit -m "chore(dsh): record last built ${{ steps.upstream.outputs.sha }}" || true
           git pull --rebase origin main || true
-          git push || echo "push failed due to race, will retry next run"
+          git push || echo "push race, next run will retry"
