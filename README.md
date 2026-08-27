@@ -55,8 +55,7 @@ docker-factory/
 │   ├── build-openchamber.yml
 │   ├── build-deepseek-harness-base.yml
 │   └── build-deepseek-harness.yml
-├── LAST_BUILD                # openchamber 上游 SHA
-└── LAST_BUILD_DSH            # deepseek-harness 上游 SHA
+└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>"}
 ```
 
 ---
