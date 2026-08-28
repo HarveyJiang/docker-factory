@@ -105,7 +105,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: steps.check.outputs.skip == 'false'
         with:
-          name: image-latest-${{ steps.date.outputs.date }}.tar
+          name: deepseek-harness-${{ steps.date.outputs.date }}.tar
           path: /tmp/image-latest.tar
           retention-days: 3
           compression-level: 0

@@ -65,7 +65,7 @@ jobs:
           echo "Saved $(du -h /tmp/image.tar | cut -f1) to /tmp/image.tar"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ env.IMAGE }}-${{ github.sha }}.tar
+          name: deepseek-harness-base-${{ github.sha }}.tar
           path: /tmp/image.tar
           retention-days: 3
           compression-level: 0
