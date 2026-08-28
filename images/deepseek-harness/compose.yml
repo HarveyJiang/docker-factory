@@ -35,9 +35,9 @@ services:
       # Python SDK 相关（如使用 python 插件）
       # PYTHONPATH: /app/python/sdk
 
-    # 默认启动 dsh web（监听 0.0.0.0:3000）
-    # 对照源码：apps/cli bin=dsh, web 为 --profile web 别名，支持 --host/--port/--no-open
-    command: ["web", "--host", "0.0.0.0", "--port", "3000"]
+    # 默认启动 dsh web（harness 禁止 0.0.0.0，需 socat 代理 0.0.0.0:3000 -> 127.0.0.1:3000）
+    # 对照源码：packages/bundle/web-app/src/startup.ts 限制 host 需为 127.0.0.1
+    command: ["web", "--host", "127.0.0.1", "--port", "3000", "--no-open", "--trusted-host", "host.docker.internal"]
     # 健康检查
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000"]

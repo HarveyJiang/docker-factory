@@ -33,10 +33,12 @@ RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
 FROM ghcr.io/harveyjiang/deepseek-harness-base:latest AS runtime
 WORKDIR /app
 COPY --from=builder /app ./
+COPY docker-entrypoint.sh /usr/local/bin/dsh-entrypoint.sh
+RUN chmod +x /usr/local/bin/dsh-entrypoint.sh
 
 ENV TZ=Asia/Shanghai
 ENV NODE_ENV=production
 EXPOSE 3000
 
-ENTRYPOINT ["pnpm", "dsh"]
-CMD ["web", "--host", "0.0.0.0", "--port", "3000"]
+ENTRYPOINT ["/usr/local/bin/dsh-entrypoint.sh"]
+CMD ["web", "--host", "127.0.0.1", "--port", "3000", "--no-open"]

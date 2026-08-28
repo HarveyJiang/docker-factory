@@ -7,6 +7,7 @@ RUN corepack enable && corepack prepare pnpm@11.7.0 --activate \
   && node --version && pnpm --version
 
 # Python + 常用工具（harness 有 python sdk，运行时需要 git/curl）
+# socat 用于代理 0.0.0.0:3000 -> 127.0.0.1:3000（harness 禁止 0.0.0.0 需用代理暴露）
 RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates \
   curl \
@@ -15,6 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   python3-pip \
   tzdata \
   bash \
+  socat \
   && rm -rf /var/lib/apt/lists/*
 
 ENV TZ=Asia/Shanghai
