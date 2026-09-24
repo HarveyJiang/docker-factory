@@ -11,6 +11,15 @@ COPY packages/web/package.json ./packages/web/
 COPY packages/electron/package.json ./packages/electron/
 COPY packages/vscode/package.json ./packages/vscode/
 COPY packages/mobile/package.json ./packages/mobile/
+COPY packages/sdk/package.json ./packages/sdk/
+# sdk/examples/* 也是 lockfile 锁定的 workspace 成员, 缺 package.json 会导致 install 失败
+COPY packages/sdk/examples/browser-provider-stub/package.json ./packages/sdk/examples/browser-provider-stub/
+COPY packages/sdk/examples/config-editor/package.json ./packages/sdk/examples/config-editor/
+COPY packages/sdk/examples/github-token/package.json ./packages/sdk/examples/github-token/
+COPY packages/sdk/examples/hello-kit/package.json ./packages/sdk/examples/hello-kit/
+COPY packages/sdk/examples/service-echo/package.json ./packages/sdk/examples/service-echo/
+COPY packages/sdk/examples/tasks-demo/package.json ./packages/sdk/examples/tasks-demo/
+COPY packages/sdk/examples/tools-only/package.json ./packages/sdk/examples/tools-only/
 RUN bun install --frozen-lockfile --ignore-scripts
 
 # Runtime production deps only. The full install pulls in devDependencies for
@@ -26,6 +35,15 @@ COPY packages/web/package.json ./packages/web/
 COPY packages/electron/package.json ./packages/electron/
 COPY packages/vscode/package.json ./packages/vscode/
 COPY packages/mobile/package.json ./packages/mobile/
+COPY packages/sdk/package.json ./packages/sdk/
+# sdk/examples/* 也是 lockfile 锁定的 workspace 成员, 缺 package.json 会导致 install 失败
+COPY packages/sdk/examples/browser-provider-stub/package.json ./packages/sdk/examples/browser-provider-stub/
+COPY packages/sdk/examples/config-editor/package.json ./packages/sdk/examples/config-editor/
+COPY packages/sdk/examples/github-token/package.json ./packages/sdk/examples/github-token/
+COPY packages/sdk/examples/hello-kit/package.json ./packages/sdk/examples/hello-kit/
+COPY packages/sdk/examples/service-echo/package.json ./packages/sdk/examples/service-echo/
+COPY packages/sdk/examples/tasks-demo/package.json ./packages/sdk/examples/tasks-demo/
+COPY packages/sdk/examples/tools-only/package.json ./packages/sdk/examples/tools-only/
 RUN bun install --frozen-lockfile --ignore-scripts --production
 
 FROM deps AS builder
