@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.6
-FROM oven/bun:1.3.14 AS base
+# 1.4.2 对齐上游 packageManager bun@1.4.2
+FROM oven/bun:1.4.2 AS base
 WORKDIR /app
 
 FROM base AS deps
@@ -46,7 +47,10 @@ COPY packages/sdk/examples/tasks-demo/package.json ./packages/sdk/examples/tasks
 COPY packages/sdk/examples/tools-only/package.json ./packages/sdk/examples/tools-only/
 RUN bun install --frozen-lockfile --ignore-scripts --production
 
-FROM deps AS builder
+# Builder: 只在本机架构(BUILDPLATFORM, GitHub runner 为 amd64)上构建一次。
+# vite build 输出是纯前端静态文件(dist) 跨平台一致, 无需在 arm64/qemu 上重复编译,
+# 可省去一半+的构建时间。(deps/prod-deps 的 node_modules 仍是目标平台各自安装)
+FROM --platform=$BUILDPLATFORM deps AS builder
 WORKDIR /app
 # 利用 BuildKit cache + 层缓存：web 未变更时直接命中缓存，变更时增量编译
 COPY . .
