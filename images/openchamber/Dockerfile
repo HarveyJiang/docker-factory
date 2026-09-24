@@ -50,6 +50,9 @@ FROM deps AS builder
 WORKDIR /app
 # 利用 BuildKit cache + 层缓存：web 未变更时直接命中缓存，变更时增量编译
 COPY . .
+# server 运行时 import @openchamber/sdk, 而 deps 安装用了 --ignore-scripts
+# 导致 root postinstall 未构建它, 需在此先构建出 dist 供 runtime 阶段拷贝
+RUN bun run --cwd packages/sdk build
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/app/node_modules/.cache \
     --mount=type=cache,target=/app/packages/web/node_modules/.vite \
@@ -71,6 +74,9 @@ COPY --from=builder /app/packages/web/package.json ./packages/web/package.json
 COPY --from=builder /app/packages/web/bin ./packages/web/bin
 COPY --from=builder /app/packages/web/server ./packages/web/server
 COPY --from=builder /app/packages/web/dist ./packages/web/dist
+# server 运行时依赖 @openchamber/sdk (main 指向 dist/index.js), 必须拷 dist
+COPY --from=builder /app/packages/sdk/package.json ./packages/sdk/package.json
+COPY --from=builder /app/packages/sdk/dist ./packages/sdk/dist
 
 EXPOSE 3000
 
