@@ -1,12 +1,15 @@
 name: build-openchamber
 
 on:
-  schedule:
-    - cron: '0 3 * * 1'  # 每周一 03:00 UTC，基础层之后
   push:
     paths:
       - "images/openchamber/Dockerfile"
       - ".github/workflows/build-openchamber.yml"
+    branches: [main]
+  # base 构建成功后自动跟进，把新 base 吃进来
+  workflow_run:
+    workflows: ["build-openchamber-base"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
     inputs:
@@ -37,6 +40,7 @@ jobs:
         id: check
         run: |
           if [ "${{ inputs.force }}" = "true" ]; then echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "workflow_run" ] && [ "${{ github.event.workflow_run.conclusion }}" = "success" ]; then echo "skip=false" >> "$GITHUB_OUTPUT"
           elif [ -f LAST_BUILDS.json ] && [ "$(jq -r '.["openchamber"] // empty' LAST_BUILDS.json)" = "${{ steps.upstream.outputs.sha }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"
           else echo "skip=false" >> "$GITHUB_OUTPUT"
           fi

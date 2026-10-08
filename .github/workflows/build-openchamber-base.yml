@@ -1,8 +1,6 @@
 name: build-openchamber-base
 
 on:
-  schedule:
-    - cron: '0 2 * * 1'  # 每周一 02:00 UTC 自动检测基础层
   push:
     paths:
       - "images/openchamber/Dockerfile.base"

@@ -63,7 +63,7 @@ RUN --mount=type=cache,target=/root/.cache \
     bun run build:web
 
 # Runtime: 使用预构建的基础镜像（包含 Java/Maven/Python/Node/gh 等重依赖）
-# 基础镜像由 images/openchamber/Dockerfile.base 构建，每周一自动更新
+# 基础镜像由 images/openchamber/Dockerfile.base 构建，上游有新版时由 check-upstream 自动触发更新
 FROM ghcr.io/harveyjiang/openchamber-base:latest AS runtime
 WORKDIR /home/openchamber
 # 基础镜像已包含所有系统依赖，此处仅继承环境变量和用户

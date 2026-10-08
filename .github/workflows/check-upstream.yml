@@ -1,0 +1,89 @@
+name: check-upstream
+
+# 事件驱动：每天查一次上游，有新版本才触发构建，不再定时空转。
+#   - @opencode/cli 出新版 -> 触发 build-openchamber-base
+#   - btriapitsyn/openchamber 出新 release -> 触发 build-openchamber
+#   - base 构建成功后，app 通过 workflow_run 自动跟着重建（吃到新 base）
+# 已查过的版本记在 .upstream.json，避免重复触发。
+
+on:
+  schedule:
+    - cron: '0 1 * * *'  # 每天 01:00 UTC 查一次
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write  # 需要触发其他 workflow
+
+env:
+  # 跟踪策略（两边通用）：major=只跟大版本；minor=忽略纯 patch（第三位），第一、二位变就编译；all=任何新版都构建。
+  OPENCODE_POLICY: minor
+  OPENCHAMBER_POLICY: minor
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Check @opencode/cli
+        id: opencode
+        run: |
+          latest="$(npm view @opencode/cli version)"
+          current="$(jq -r '.opencode_cli // empty' .upstream.json 2>/dev/null)"
+          echo "latest=$latest current=$current"
+          build=false
+          if [ -n "$latest" ] && [ "$latest" != "$current" ]; then
+            if [ "$OPENCODE_POLICY" = "major" ]; then
+              [ "${latest%%.*}" != "${current%%.*}" ] && build=true
+            elif [ "$OPENCODE_POLICY" = "minor" ]; then
+              [ "${latest%.*}" != "${current%.*}" ] && build=true
+            else
+              build=true
+            fi
+          fi
+          echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+      - name: Check upstream openchamber release
+        id: app
+        run: |
+          tag="$(gh api repos/btriapitsyn/openchamber/releases/latest --jq .tag_name)"
+          current="$(jq -r '.openchamber_release // empty' .upstream.json 2>/dev/null)"
+          echo "tag=$tag current=$current"
+          # 去掉前导 v 后比较：minor 策略比 major.minor，major 策略比 major
+          norm() { echo "${1#v}" | cut -d. -f"$2"; }
+          build=false
+          if [ -n "$tag" ] && [ "$tag" != "$current" ]; then
+            if [ "$OPENCHAMBER_POLICY" = "major" ]; then
+              [ "$(norm "$tag" 1)" != "$(norm "$current" 1)" ] && build=true
+            elif [ "$OPENCHAMBER_POLICY" = "minor" ]; then
+              [ "$(norm "$tag" 1-2)" != "$(norm "$current" 1-2)" ] && build=true
+            else
+              build=true
+            fi
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "build=$build" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Trigger builds
+        run: |
+          [ "${{ steps.opencode.outputs.build }}" = "true" ] && gh workflow run build-openchamber-base.yml --ref main && echo "base 构建已触发"
+          [ "${{ steps.app.outputs.build }}" = "true" ] && gh workflow run build-openchamber.yml --ref main && echo "app 构建已触发"
+          [ "${{ steps.opencode.outputs.build }}" = "true" ] || [ "${{ steps.app.outputs.build }}" = "true" ] || echo "上游无变化，跳过"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Record tracked versions
+        if: steps.opencode.outputs.build == 'true' || steps.app.outputs.build == 'true'
+        run: |
+          cli="${{ steps.opencode.outputs.latest }}"
+          tag="${{ steps.app.outputs.tag }}"
+          [ -z "$cli" ] && cli="$(jq -r '.opencode_cli // empty' .upstream.json)"
+          [ -z "$tag" ] && tag="$(jq -r '.openchamber_release // empty' .upstream.json)"
+          jq -n --arg cli "$cli" --arg rel "$tag" '{opencode_cli: $cli, openchamber_release: $rel}' > .upstream.json
+          cat .upstream.json
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add .upstream.json
+          git commit -m "chore: track upstream opencode@$cli openchamber@$tag" || true
+          git pull --rebase origin main || true
+          git push || echo "push race, next run will retry"

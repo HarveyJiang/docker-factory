@@ -1,6 +1,6 @@
 # OpenChamber - docker compose 直接运行
 # 上游: https://github.com/btriapitsyn/openchamber
-# 镜像: ghcr.io/harveyjiang/openchamber (Base+App 双层，每周巡检)
+# 镜像: ghcr.io/harveyjiang/openchamber (Base+App 双层，上游有新版时自动重建)
 # 使用: 复制本文件到任意目录，修改 .env 后 docker compose up -d
 #
 # 升级/重装流程（卷结构 v2，整目录挂载）：
