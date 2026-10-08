@@ -1,22 +1,31 @@
 # OpenChamber - docker compose 直接运行
 # 上游: https://github.com/btriapitsyn/openchamber
-# 镜像: ghcr.io/harveyjiang/openchamber:latest (Base+App 双层，每周巡检)
+# 镜像: ghcr.io/harveyjiang/openchamber (Base+App 双层，每周巡检)
 # 使用: 复制本文件到任意目录，修改 .env 后 docker compose up -d
+#
+# 升级/重装流程（卷结构 v2，整目录挂载）：
+#   1. 备份: tar -czf backup-$(date +%F).tgz data/          # 先备份，丢了能回来
+#   2. 迁移（仅旧版零散卷结构需要）: bash migrate-volumes.sh
+#   3. 启动: docker compose up -d
+#   4. 体检: docker exec openchamber bash ~/workspaces/openchamber-docker/check-config.sh
 
 services:
   openchamber:
-    image: ghcr.io/harveyjiang/openchamber:latest
+    # 版本 pin 在 .env 的 OPENCHAMBER_IMAGE_TAG，升级时手动改 tag 再 up -d；
+    # 默认 latest 保持兼容旧行为。升级前务必先备份 data/。
+    image: ghcr.io/harveyjiang/openchamber:${OPENCHAMBER_IMAGE_TAG:-latest}
     container_name: openchamber
     ports:
       - "3000:3000"  # Web UI
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
-      # 持久化目录（宿主机 ./data/* 自动创建）
-      - ./data/openchamber:/home/openchamber/.config/openchamber
-      - ./data/opencode/share:/home/openchamber/.local/share/opencode
-      - ./data/opencode/state:/home/openchamber/.local/state/opencode
-      - ./data/opencode/config:/home/openchamber/.config/opencode
+      # v2 整目录挂载：.config / .local 全收录，新增的凭证目录
+      # （.cloudflare/api-token、.wrangler、gh、git 等）重装不再丢。
+      # 注意：宿主机空目录首次挂载会遮住镜像内置默认配置，属预期行为，
+      # entrypoint / check-config.sh 会按需重建。
+      - ./data/config:/home/openchamber/.config
+      - ./data/local:/home/openchamber/.local
       - ./data/ssh:/home/openchamber/.ssh
       - ./workspaces:/home/openchamber/workspaces
     environment:
@@ -54,9 +63,14 @@ services:
       # mvn -v && java -version && python3 --version
 
     restart: unless-stopped
-    # 健康检查（可选）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000"]
+      # curl 为主、wget 兜底，base 镜像换源也不怕
+      test: ["CMD-SHELL", "curl -fs http://localhost:3000 || wget -qO- http://localhost:3000 > /dev/null"]
       interval: 30s
       timeout: 10s
       retries: 3

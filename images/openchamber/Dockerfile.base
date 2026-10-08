@@ -60,10 +60,14 @@ ENV NPM_CONFIG_PREFIX=/home/openchamber/.npm-global
 ENV PATH=${NPM_CONFIG_PREFIX}/bin:${PATH}
 ENV WRANGLER_CACHE_DIR=/home/openchamber/.config/.wrangler/cache
 
+# opencode 跟随上游最新版：版本号由 CI 经 OPENCODE_VERSION 传进来，
+# 本地构建不传参时默认 latest。版本变化会自动使该层缓存失效重装，
+# 上游没发版则命中缓存，不浪费构建时间。
+ARG OPENCODE_VERSION=latest
 RUN npm config set prefix /home/openchamber/.npm-global && mkdir -p /home/openchamber/.npm-global && \
   mkdir -p /home/openchamber/.local /home/openchamber/.config /home/openchamber/.ssh && \
-  # @opencode/cli@2.0.15 对齐上游 openchamber v2.0 runtime (OpenChamber 2.0 需要 opencode v2 CLI)
-  npm install -g --cache /tmp/npm-cache @opencode/cli@2.0.15 wrangler && \
+  npm install -g --cache /tmp/npm-cache @opencode/cli@${OPENCODE_VERSION} wrangler && \
+  npm ls -g @opencode/cli && \
   rm -rf /tmp/npm-cache /home/openchamber/.npm
 
 # 5. cloudflared

@@ -48,6 +48,33 @@ fi
 check_file "cfdns.sh (DNS 管理脚本)" "$HOME/workspaces/openchamber-docker/cfdns.sh"
 
 echo
+echo "== Cloudflare 环境变量 =="
+if [ ! -f "$HOME/.config/opencode/cloudflare.env" ]; then
+  echo "  [FIX] cloudflare.env 缺失，正在重建（本体不含明文，可重建）..."
+  cat > "$HOME/.config/opencode/cloudflare.env" <<'EOF'
+# Cloudflare API (DNS / Pages / D1 共用)
+# Token 本体在 ~/.config/.cloudflare/api-token（Zone + DNS 可编辑 2020224.xyz），
+# 这里只做中转，不存明文，token 文件更新后自动生效。
+#   source ~/.config/opencode/cloudflare.env
+if [ -f "$HOME/.config/.cloudflare/api-token" ]; then
+  export CLOUDFLARE_API_TOKEN="$(tr -d '\r\n' < "$HOME/.config/.cloudflare/api-token")"
+fi
+export CLOUDFLARE_ACCOUNT_ID="2dd2de9c034a4bf86b8f59bb11d69c0b"
+export CLOUDFLARE_ZONE="2020224.xyz"
+EOF
+fi
+check_file "cloudflare.env(CLOUDFLARE_API_TOKEN 中转)" "$HOME/.config/opencode/cloudflare.env"
+# ~/.bashrc 不在持久卷里，重装会丢，这里自愈
+if [ ! -f "$HOME/.bashrc" ] || ! grep -q "opencode/cloudflare.env" "$HOME/.bashrc" 2>/dev/null; then
+  echo "  [FIX] ~/.bashrc 缺失或未加载 cloudflare.env，正在恢复..."
+  touch "$HOME/.bashrc"
+  grep -q 'npm-global/bin' "$HOME/.bashrc" 2>/dev/null || echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> "$HOME/.bashrc"
+  grep -q 'opencode/s3.env' "$HOME/.bashrc" 2>/dev/null || echo '[ -f "$HOME/.config/opencode/s3.env" ] && source "$HOME/.config/opencode/s3.env"' >> "$HOME/.bashrc"
+  grep -q 'opencode/cloudflare.env' "$HOME/.bashrc" 2>/dev/null || echo '[ -f "$HOME/.config/opencode/cloudflare.env" ] && source "$HOME/.config/opencode/cloudflare.env"' >> "$HOME/.bashrc"
+fi
+grep -q "opencode/cloudflare.env" "$HOME/.bashrc" 2>/dev/null && ok "~/.bashrc 已加载 cloudflare.env" || miss "~/.bashrc 恢复失败，需手动处理"
+
+echo
 echo "== 1Panel 面板 API =="
 check_file "1Panel API token" "$HOME/.config/.1panel/api-token"
 if [ -f "$HOME/.config/.1panel/api-token" ]; then
