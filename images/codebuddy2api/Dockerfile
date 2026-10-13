@@ -1,12 +1,23 @@
 # syntax=docker/dockerfile:1.6
 # codebuddy2api 应用层：FROM base，分层缓存
 # 基础镜像由 images/codebuddy2api/Dockerfile.base 构建
+# requirements.lock.txt 来自上游 clone（workflow cp 本 Dockerfile 到 src/ 后构建）
+
+# ---------- deps: 锁文件变更时才重装，命中缓存秒级 ----------
+FROM ghcr.io/harveyjiang/codebuddy2api-base:latest AS deps
+WORKDIR /app
+COPY requirements.lock.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.lock.txt
 
 # ---------- runtime ----------
 FROM ghcr.io/harveyjiang/codebuddy2api-base:latest AS runtime
 WORKDIR /app
+# pip 依赖装在 deps 阶段，runtime 复制 site-packages
+COPY --from=deps /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
+COPY --from=deps /usr/local/bin /usr/local/bin
 
-# 源码直接来自上游 clone（workflow 已 cp 本 Dockerfile 到 src/）
+# 上游源码
 COPY core ./core
 COPY admin ./admin
 
