@@ -19,8 +19,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE: ghcr.io/harveyjiang/codebuddy2api
-  UPSTREAM_REPO: https://github.com/ShouZhuo0413/codebuddy2api.git
-  UPSTREAM_BRANCH: main
+  UPSTREAM_REPO: https://github.com/HarveyJiang/codebuddy2api.git
+  UPSTREAM_BRANCH: dev
 
 jobs:
   build:
