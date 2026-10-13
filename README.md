@@ -6,6 +6,7 @@
 [![build-openchamber](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber.yml)
 [![build-deepseek-harness-base](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness-base.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness-base.yml)
 [![build-deepseek-harness](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness.yml)
+[![build-codebuddy2api-base](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-codebuddy2api-base.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-codebuddy2api-base.yml) [![build-codebuddy2api](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-codebuddy2api.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-codebuddy2api.yml)
 
 原 `openchamber-docker` 已重命名为 `docker-factory`，旧地址自动 301 跳转。
 
@@ -19,6 +20,8 @@
 | **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [btriapitsyn/openchamber](https://github.com/btriapitsyn/openchamber) `main` | `FROM openchamber-base` | `bun install` + `build:web` (vite) | 每周一 03:00 UTC + `LAST_BUILD` |
 | **deepseek-harness-base** | `ghcr.io/harveyjiang/deepseek-harness-base:latest` | - | `images/deepseek-harness/Dockerfile.base`<br>`node:24-bookworm` + `pnpm@11.7.0` + `python3` | - | 每周一 02:00 UTC + `paths` |
 | **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | 每周一 03:00 UTC + `LAST_BUILD_DSH` |
+| **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | 每周一 02:00 UTC + `paths` |
+| **codebuddy2api** | `ghcr.io/harveyjiang/codebuddy2api:latest` | [ShouZhuo0413/codebuddy2api](https://github.com/ShouZhuo0413/codebuddy2api) `main` | `FROM codebuddy2api-base` | `COPY core/ admin/`（纯 Python 无编译） | 每周一 03:00 UTC + `LAST_BUILDS.json` |
 
 **缓存策略：** `Base` 用 `registry:cache`，`App` 用 `registry+gha` 双缓存。仅改基础包时 `App` 30s 内完成（`build:web` 命中）；`web` 未变更时增量 vite；上游无更新则 `skip`。
 
@@ -35,6 +38,15 @@ docker run -p 3000:3000 ghcr.io/harveyjiang/openchamber
 docker pull ghcr.io/harveyjiang/deepseek-harness:latest
 docker run -it --rm ghcr.io/harveyjiang/deepseek-harness dsh --help
 docker run -it --rm -p 3000:3000 ghcr.io/harveyjiang/deepseek-harness web
+
+# codebuddy2api (WorkBuddy/CodeBuddy 订阅转 OpenAI/Anthropic 兼容 API)
+docker pull ghcr.io/harveyjiang/codebuddy2api:latest
+docker run -d -p 127.0.0.1:8787:8787 \
+  -e ADMIN_KEY=$(python3 -c 'import secrets;print(secrets.token_urlsafe(36))') \
+  -e CODEBUDDY2OPENAI_KEY=sk-wb-$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))') \
+  -v ./data/auth:/data/auth -v ./data/management:/data/management \
+  ghcr.io/harveyjiang/codebuddy2api
+# 管理后台 http://127.0.0.1:8787/admin/ (OAuth 添加账号)
 ```
 
 ---
@@ -86,6 +98,27 @@ docker compose logs -f
 
 **对应源码：** `deepseek-ai/deepseek-harness:scripts/client-build-environment.ts` + `apps/cli`，`DSH_CLIENT_TITLE / DSH_WEB_PORT` 等
 
+### CodeBuddy2API
+
+```
+# 1. 复制
+cp images/codebuddy2api/compose.yml ./compose.yml
+cp images/codebuddy2api/.env.example ./.env
+
+# 2. 生成密钥（均必填）
+echo "ADMIN_KEY=$(python3 -c 'import secrets;print(secrets.token_urlsafe(36))')" >> .env
+echo "CODEBUDDY2OPENAI_KEY=sk-wb-$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')" >> .env
+
+# 3. 一键启动
+docker compose up -d
+# 浏览器打开 http://127.0.0.1:8787/admin/ 用 ADMIN_KEY 登录 → OAuth 添加账号
+#
+# ⚠️ 密钥变更注意：ADMIN_KEY / CODEBUDDY2OPENAI_KEY 仅在 store 首次初始化时注册，
+# 改 .env 后需删除 data/management/state.json 再 docker compose up -d --force-recreate 才生效
+```
+
+**对应源码：** `ShouZhuo0413/codebuddy2api:deploy/one-click`，`ADMIN_KEY / CODEBUDDY2OPENAI_KEY / CODEBUDDY_AUTH_DIR` 等
+
 ### 工厂统一约定
 
 - 所有 `compose.yml` 使用 `ghcr.io/harveyjiang/<image>:latest`，每周自动更新
@@ -105,12 +138,20 @@ docker-factory/
 │   └── deepseek-harness/
 │       ├── Dockerfile.base   # Node24+pnpm+Python
 │       └── Dockerfile        # FROM base + pnpm build
+├── images/
+│   └── codebuddy2api/
+│       ├── Dockerfile.base   # Python3.12+FastAPI 依赖
+│       ├── Dockerfile        # FROM base + COPY core/admin
+│       ├── compose.yml
+│       └── .env.example
 ├── .github/workflows/
 │   ├── build-openchamber-base.yml
 │   ├── build-openchamber.yml
 │   ├── build-deepseek-harness-base.yml
-│   └── build-deepseek-harness.yml
-└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>"}
+│   ├── build-deepseek-harness.yml
+│   ├── build-codebuddy2api-base.yml
+│   └── build-codebuddy2api.yml
+└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>","codebuddy2api":"<sha>"}
 ```
 
 ---

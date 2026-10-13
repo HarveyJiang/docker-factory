@@ -1,0 +1,26 @@
+# syntax=docker/dockerfile:1.6
+# codebuddy2api 基础镜像：Python 3.12 + FastAPI 运行依赖公共层
+# 依赖锁文件稳定，月级变更
+FROM python:3.12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+  ca-certificates \
+  curl \
+  git \
+  tzdata \
+  bash \
+  && rm -rf /var/lib/apt/lists/*
+
+ENV TZ=Asia/Shanghai
+RUN ln -sf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime \
+  && echo "Asia/Shanghai" > /etc/timezone
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1
+
+# 依赖安装放在 base 层：requirements.lock.txt 极少变更，命中缓存时秒级
+WORKDIR /app
+COPY requirements.lock.txt ./
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements.lock.txt

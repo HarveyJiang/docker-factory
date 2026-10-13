@@ -1,0 +1,37 @@
+name: codebuddy2api
+
+services:
+  app:
+    image: ghcr.io/harveyjiang/codebuddy2api:latest
+    container_name: codebuddy2api
+    restart: unless-stopped
+    ports:
+      # 仅监听本机回环；对外请在前面加 HTTPS 反向代理
+      - "127.0.0.1:8787:8787"
+    environment:
+      # 管理后台密钥（≥20 位），首次启动自动写入 store，之后改这里不会生效（删除 data/management/state.json 重建才生效）
+      ADMIN_KEY: ${ADMIN_KEY:?请在 .env 中设置至少 20 位的 ADMIN_KEY}
+      # 客户端 API Key（OpenAI 兼容接口用）
+      CODEBUDDY2OPENAI_KEY: ${CODEBUDDY2OPENAI_KEY:?请在 .env 中设置 CODEBUDDY2OPENAI_KEY}
+      CODEBUDDY_AUTH_DIR: /data/auth
+      MANAGEMENT_DATA_DIR: /data/management
+      TZ: Asia/Shanghai
+    volumes:
+      - ./data/auth:/data/auth
+      - ./data/management:/data/management
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# 快速开始：
+#   echo "ADMIN_KEY=$(python3 -c 'import secrets;print(secrets.token_urlsafe(36))')" >> .env
+#   echo "CODEBUDDY2OPENAI_KEY=sk-wb-$(python3 -c 'import secrets;print(secrets.token_urlsafe(32))')" >> .env
+#   docker compose up -d
+#   浏览器打开 http://127.0.0.1:8787/admin/ 用 ADMIN_KEY 登录，OAuth 添加账号
+#
+# 客户端接入：
+#   Base URL: http://127.0.0.1:8787/v1   (OpenAI 兼容 /v1/chat/completions、/v1/responses)
+#   Anthropic: http://127.0.0.1:8787     (/v1/messages)
+#   API Key:  CODEBUDDY2OPENAI_KEY 的值
