@@ -64,10 +64,11 @@ jobs:
       - name: Get current date
         id: date
         # 只精确到天时，同一天多次构建会互相覆盖同一个 tag，
-        # 无法分辨哪个是新的。加上 UTC 时分秒，每次都唯一。
+        # 无法分辨哪个是新的。加上时分秒，每次都唯一。
+        # 时间用北京时间（Asia/Shanghai）：20261014-230733，与服务器本地时间一致，便于对账。
         run: |
-          echo "date=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-          echo "stamp=$(date -u +%Y-%m-%dT%H%M%SZ)" >> "$GITHUB_OUTPUT"
+          echo "date=$(TZ=Asia/Shanghai date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          echo "stamp=$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
       - name: Build and push
         if: steps.check.outputs.skip == 'false'
         uses: docker/build-push-action@v7
