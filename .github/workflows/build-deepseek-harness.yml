@@ -1,12 +1,8 @@
 name: build-deepseek-harness
 
+# 已停用：该项目上游持续构建失败，自动触发（schedule/push/workflow_run）全部关闭，
+# 只保留 workflow_dispatch 手动构建。修好上游后再考虑恢复。
 on:
-  push:
-    paths:
-      - "images/deepseek-harness/Dockerfile"
-      - "images/deepseek-harness/docker-entrypoint.sh"
-      - ".github/workflows/build-deepseek-harness.yml"
-    branches: [main]
   workflow_dispatch:
     inputs:
       force:
