@@ -1,8 +1,6 @@
 name: build-deepseek-harness
 
 on:
-  schedule:
-    - cron: '0 3 * * 1'  # 每周一 03:00 UTC
   push:
     paths:
       - "images/deepseek-harness/Dockerfile"
