@@ -9,9 +9,11 @@ WORKDIR /home/openchamber
 # trixie 已无 openjdk-17，使用 21 (兼容 17，且为当前 LTS)
 RUN apt-get update && apt-get install -y --no-install-recommends \
   bash \
+  bzip2 \
   ca-certificates \
   curl \
   git \
+  git-lfs \
   jq \
   less \
   openssh-client \
@@ -22,7 +24,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   tzdata \
   unzip \
   wget \
+  xz-utils \
   zip \
+  zstd \
   openjdk-21-jdk \
   maven \
   && java -version && mvn -version \
