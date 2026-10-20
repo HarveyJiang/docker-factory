@@ -1,0 +1,109 @@
+name: build-workbuddy2api-panel
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'  # 每周一 03:00 UTC
+  push:
+    paths:
+      - "images/workbuddy2api-panel/**"
+      - ".github/workflows/build-workbuddy2api-panel.yml"
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 'Force rebuild even if upstream unchanged'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE: ghcr.io/harveyjiang/workbuddy2api-panel
+  UPSTREAM_REPO: https://github.com/HarveyJiang/workbuddy2api-panel.git
+  UPSTREAM_BRANCH: main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Get upstream HEAD
+        id: upstream
+        run: echo "sha=$(git ls-remote $UPSTREAM_REPO refs/heads/$UPSTREAM_BRANCH | cut -f1)" >> "$GITHUB_OUTPUT"
+      - name: Check for updates
+        id: check
+        run: |
+          if [ "${{ inputs.force }}" = "true" ]; then echo "skip=false" >> "$GITHUB_OUTPUT"
+          elif [ -f LAST_BUILDS.json ] && [ "$(jq -r '.["workbuddy2api-panel"] // empty' LAST_BUILDS.json)" = "${{ steps.upstream.outputs.sha }}" ]; then echo "skip=true" >> "$GITHUB_OUTPUT"
+          else echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      # 上游自带多阶段 Dockerfile（Go 编译 → alpine 运行），
+      # 没有需要外置的锁文件或补丁，直接用原文件构建，不维护镜像侧副本。
+      - name: Clone upstream
+        if: steps.check.outputs.skip == 'false'
+        run: git clone --depth 1 --branch $UPSTREAM_BRANCH $UPSTREAM_REPO src
+      - name: Login to GHCR
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up QEMU and Buildx
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/setup-qemu-action@v4
+      - uses: docker/setup-buildx-action@v4
+        if: steps.check.outputs.skip == 'false'
+      - name: Get current date
+        id: date
+        # 时间用北京时间（Asia/Shanghai）：20261014-230733，与服务器本地时间一致，便于对账。
+        run: |
+          echo "date=$(TZ=Asia/Shanghai date +%Y%m%d)" >> "$GITHUB_OUTPUT"
+          echo "stamp=$(TZ=Asia/Shanghai date +%Y%m%d-%H%M%S)" >> "$GITHUB_OUTPUT"
+      - name: Build and push
+        if: steps.check.outputs.skip == 'false'
+        uses: docker/build-push-action@v7
+        with:
+          context: ./src
+          file: ./src/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          cache-from: |
+            type=registry,ref=${{ env.IMAGE }}:cache
+            type=gha
+          cache-to: |
+            type=registry,ref=${{ env.IMAGE }}:cache,mode=max
+            type=gha,mode=max
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:main-${{ steps.upstream.outputs.sha }}
+            ${{ env.IMAGE }}:${{ steps.date.outputs.stamp }}
+            ${{ env.IMAGE }}:${{ steps.date.outputs.date }}
+      - name: Report image size (human-readable)
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          echo "### 📦 Image Size (human-readable)" >> $GITHUB_STEP_SUMMARY
+          echo "| Image | Size | Tag |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|------|-----|" >> $GITHUB_STEP_SUMMARY
+          for TAG in "latest" "${{ steps.date.outputs.date }}"; do
+            IMAGE="${{ env.IMAGE }}:$TAG"
+            docker pull "$IMAGE" --quiet || true
+            SIZE=$(docker images "$IMAGE" --format "{{.Size}}" | head -1)
+            if [ -z "$SIZE" ]; then SIZE="manifest-list"; fi
+            echo "| \`$IMAGE\` | **$SIZE** | \`$TAG\` |" >> $GITHUB_STEP_SUMMARY
+            echo "Image $IMAGE Size: $SIZE"
+          done
+          docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.date.outputs.date }}" 2>&1 | head -60 || true
+      - name: Record last built SHA
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          jq --arg sha "${{ steps.upstream.outputs.sha }}" '.["workbuddy2api-panel"] = $sha' LAST_BUILDS.json > /tmp/LAST_BUILDS.json && mv /tmp/LAST_BUILDS.json LAST_BUILDS.json
+          git config user.name "github-actions"
+          git config user.email "actions@github.com"
+          git add LAST_BUILDS.json
+          git commit -m "chore(workbuddy2api-panel): record last built ${{ steps.upstream.outputs.sha }}" || true
+          git pull --rebase origin main || true
+          git push || echo "push race, next run will retry"

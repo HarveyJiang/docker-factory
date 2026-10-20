@@ -1,0 +1,38 @@
+# WorkBuddy2API Panel - docker compose 直接运行
+# 上游: https://github.com/HarveyJiang/workbuddy2api-panel
+# 镜像: ghcr.io/harveyjiang/workbuddy2api-panel (Base+App 双层，上游有新版时自动重建)
+#
+# 使用:
+#   cp .env.example .env && mkdir -p auths data
+#   cp ../../../../images/workbuddy2api-panel/config.example.json ./config.json
+#   docker compose up -d
+#
+# 注意:
+#   - 宿主机必须先有 config.json（文件），否则 docker 会把挂载点创建成目录导致启动失败。
+#   - 容器默认以 uid 10001 运行，挂载目录属主不同会写 auths 失败。
+#     解法：.env 里设 PUID/PGID 为你自己的 uid，或 sudo chown -R 10001:10001 ./auths ./data。
+
+services:
+  workbuddy2api-panel:
+    image: ghcr.io/harveyjiang/workbuddy2api-panel:${PANEL_IMAGE_TAG:-latest}
+    container_name: workbuddy2api-panel
+    restart: unless-stopped
+    user: "${PUID:-10001}:${PGID:-10001}"
+    environment:
+      - TZ=Asia/Shanghai
+    ports:
+      - "127.0.0.1:7863:7863"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./auths:/app/auths
+      - ./data:/app/data
+      - ./config.json:/app/config.json
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:7863/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

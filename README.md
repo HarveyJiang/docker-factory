@@ -22,6 +22,7 @@
 | **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | 每周一 03:00 UTC + `LAST_BUILD_DSH` |
 | **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | 每周一 02:00 UTC + `paths` |
 | **codebuddy2api** | `ghcr.io/harveyjiang/codebuddy2api:latest` | [ShouZhuo0413/codebuddy2api](https://github.com/ShouZhuo0413/codebuddy2api) `main` | `FROM codebuddy2api-base` | `COPY core/ admin/`（纯 Python 无编译） | 每周一 03:00 UTC + `LAST_BUILDS.json` |
+| **workbuddy2api-panel** | `ghcr.io/harveyjiang/workbuddy2api-panel:latest` | [HarveyJiang/workbuddy2api-panel](https://github.com/HarveyJiang/workbuddy2api-panel) `main` | 上游自带多阶段 Dockerfile（`golang:1.23-alpine` → `alpine:3.20`），镜像侧不维护副本 | `go build` 4 个二进制（server/signin/login/credit） | 每周一 03:00 UTC + `LAST_BUILDS.json` |
 
 **缓存策略：** `Base` 用 `registry:cache`，`App` 用 `registry+gha` 双缓存。仅改基础包时 `App` 30s 内完成（`build:web` 命中）；`web` 未变更时增量 vite；上游无更新则 `skip`。
 
@@ -47,6 +48,13 @@ docker run -d -p 127.0.0.1:8787:8787 \
   -v ./data/auth:/data/auth -v ./data/management:/data/management \
   ghcr.io/harveyjiang/codebuddy2api
 # 管理后台 http://127.0.0.1:8787/admin/ (OAuth 添加账号)
+
+# workbuddy2api-panel (WorkBuddy 账号网关 + Web 管理面板，Go 版)
+docker pull ghcr.io/harveyjiang/workbuddy2api-panel:latest
+docker run -d -p 127.0.0.1:7863:7863 \
+  -v ./auths:/app/auths -v ./data:/app/data \
+  ghcr.io/harveyjiang/workbuddy2api-panel
+# 面板 http://127.0.0.1:7863/healthz
 ```
 
 ---
@@ -119,6 +127,22 @@ docker compose up -d
 
 **对应源码：** `ShouZhuo0413/codebuddy2api:deploy/one-click`，`ADMIN_KEY / CODEBUDDY2OPENAI_KEY / CODEBUDDY_AUTH_DIR` 等
 
+### WorkBuddy2API Panel
+
+```
+# 1. 复制
+cp images/workbuddy2api-panel/compose.yml ./compose.yml
+cp images/workbuddy2api-panel/config.example.json ./config.json   # 必须是文件，缺了 docker 会建成目录
+mkdir -p auths data
+
+# 2. 启动（容器默认 uid 10001，挂载目录属主不匹配会写 auths 失败）
+#    解法：建 .env 写 PUID=$(id -u) PGID=$(id -g)，或 sudo chown -R 10001:10001 ./auths ./data
+docker compose up -d
+# 面板 http://127.0.0.1:7863
+```
+
+**对应源码：** `HarveyJiang/workbuddy2api-panel:Dockerfile` + `docker-compose.yml`，Go 1.22.5 项目，端口 7863
+
 ### 工厂统一约定
 
 - 所有 `compose.yml` 使用 `ghcr.io/harveyjiang/<image>:latest`，每周自动更新
@@ -144,14 +168,19 @@ docker-factory/
 │       ├── Dockerfile        # FROM base + COPY core/admin
 │       ├── compose.yml
 │       └── .env.example
+├── images/
+│   └── workbuddy2api-panel/
+│       ├── compose.yml        # 部署用，Dockerfile 直接用上游自带的多阶段文件
+│       └── config.example.json
 ├── .github/workflows/
 │   ├── build-openchamber-base.yml
 │   ├── build-openchamber.yml
 │   ├── build-deepseek-harness-base.yml
 │   ├── build-deepseek-harness.yml
 │   ├── build-codebuddy2api-base.yml
-│   └── build-codebuddy2api.yml
-└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>","codebuddy2api":"<sha>"}
+│   ├── build-codebuddy2api.yml
+│   └── build-workbuddy2api-panel.yml
+└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>","codebuddy2api":"<sha>","workbuddy2api-panel":"<sha>"}
 ```
 
 ---
