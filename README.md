@@ -22,7 +22,7 @@
 | **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | 每周一 03:00 UTC + `LAST_BUILD_DSH` |
 | **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | 每周一 02:00 UTC + `paths` |
 | **codebuddy2api** | `ghcr.io/harveyjiang/codebuddy2api:latest` | [ShouZhuo0413/codebuddy2api](https://github.com/ShouZhuo0413/codebuddy2api) `main` | `FROM codebuddy2api-base` | `COPY core/ admin/`（纯 Python 无编译） | 每周一 03:00 UTC + `LAST_BUILDS.json` |
-| **workbuddy2api-panel** | `ghcr.io/harveyjiang/workbuddy2api-panel:latest` | [HarveyJiang/workbuddy2api-panel](https://github.com/HarveyJiang/workbuddy2api-panel) `main` | 上游自带多阶段 Dockerfile（`golang:1.23-alpine` → `alpine:3.20`），镜像侧不维护副本 | `go build` 4 个二进制（server/signin/login/credit） | 每周一 03:00 UTC + `LAST_BUILDS.json` |
+| **workbuddy2api-panel** | `ghcr.io/harveyjiang/workbuddy2api-panel:latest` | [HarveyJiang/workbuddy2api-panel](https://github.com/HarveyJiang/workbuddy2api-panel) `main` | 上游自带多阶段 Dockerfile（`golang:1.23-alpine` → `alpine:3.20`），镜像侧不维护副本 | `go build` 4 个二进制（server/signin/login/credit） | **仅手动触发** |
 
 **缓存策略：** `Base` 用 `registry:cache`，`App` 用 `registry+gha` 双缓存。仅改基础包时 `App` 30s 内完成（`build:web` 命中）；`web` 未变更时增量 vite；上游无更新则 `skip`。
 

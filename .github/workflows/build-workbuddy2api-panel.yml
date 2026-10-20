@@ -1,13 +1,7 @@
 name: build-workbuddy2api-panel
 
 on:
-  schedule:
-    - cron: '0 3 * * 1'  # 每周一 03:00 UTC
-  push:
-    paths:
-      - "images/workbuddy2api-panel/**"
-      - ".github/workflows/build-workbuddy2api-panel.yml"
-    branches: [main]
+  # 用户要求：只手动触发，不自动构建。
   workflow_dispatch:
     inputs:
       force:
