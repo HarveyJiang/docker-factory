@@ -17,7 +17,7 @@
 | 镜像 | GHCR | 上游 | 基础层 | 应用层 | 巡检 |
 |------|------|------|--------|--------|------|
 | **openchamber-base** | `ghcr.io/harveyjiang/openchamber-base:latest` | - | `images/openchamber/Dockerfile.base`<br>`oven/bun:1.3.14` + `openjdk-21/maven` + `python3/node24/gh/cloudflared` | - | **仅手动触发** |
-| **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [btriapitsyn/openchamber](https://github.com/btriapitsyn/openchamber) `main` | `FROM openchamber-base` | `bun install` + `build:web` (vite) | **仅手动触发** |
+| **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [btriapitsyn/openchamber](https://github.com/btriapitsyn/openchamber) `main` | `FROM openchamber-base` | `bun install` + `build:web` (vite) | **仅手动触发** + base 成功后自动联动 |
 | **deepseek-harness-base** | `ghcr.io/harveyjiang/deepseek-harness-base:latest` | - | `images/deepseek-harness/Dockerfile.base`<br>`node:24-bookworm` + `pnpm@11.7.0` + `python3` | - | **仅手动触发** |
 | **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | **仅手动触发** |
 | **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | **仅手动触发** |
