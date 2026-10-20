@@ -1,6 +1,6 @@
 # Docker Factory 🏭
 
-> 统一镜像工厂：一仓库多镜像，Base+App 双层 + 双缓存，每周自动巡检上游
+> 统一镜像工厂：一仓库多镜像，Base+App 双层 + 双缓存，**全部手动触发构建**
 
 [![build-openchamber-base](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber-base.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber-base.yml)
 [![build-openchamber](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber.yml)
@@ -16,12 +16,12 @@
 
 | 镜像 | GHCR | 上游 | 基础层 | 应用层 | 巡检 |
 |------|------|------|--------|--------|------|
-| **openchamber-base** | `ghcr.io/harveyjiang/openchamber-base:latest` | - | `images/openchamber/Dockerfile.base`<br>`oven/bun:1.3.14` + `openjdk-21/maven` + `python3/node24/gh/cloudflared` | - | 每周一 02:00 UTC + `paths` |
-| **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [btriapitsyn/openchamber](https://github.com/btriapitsyn/openchamber) `main` | `FROM openchamber-base` | `bun install` + `build:web` (vite) | 每周一 03:00 UTC + `LAST_BUILD` |
-| **deepseek-harness-base** | `ghcr.io/harveyjiang/deepseek-harness-base:latest` | - | `images/deepseek-harness/Dockerfile.base`<br>`node:24-bookworm` + `pnpm@11.7.0` + `python3` | - | 每周一 02:00 UTC + `paths` |
-| **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | 每周一 03:00 UTC + `LAST_BUILD_DSH` |
-| **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | 每周一 02:00 UTC + `paths` |
-| **codebuddy2api** | `ghcr.io/harveyjiang/codebuddy2api:latest` | [ShouZhuo0413/codebuddy2api](https://github.com/ShouZhuo0413/codebuddy2api) `main` | `FROM codebuddy2api-base` | `COPY core/ admin/`（纯 Python 无编译） | 每周一 03:00 UTC + `LAST_BUILDS.json` |
+| **openchamber-base** | `ghcr.io/harveyjiang/openchamber-base:latest` | - | `images/openchamber/Dockerfile.base`<br>`oven/bun:1.3.14` + `openjdk-21/maven` + `python3/node24/gh/cloudflared` | - | **仅手动触发** |
+| **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [btriapitsyn/openchamber](https://github.com/btriapitsyn/openchamber) `main` | `FROM openchamber-base` | `bun install` + `build:web` (vite) | **仅手动触发** |
+| **deepseek-harness-base** | `ghcr.io/harveyjiang/deepseek-harness-base:latest` | - | `images/deepseek-harness/Dockerfile.base`<br>`node:24-bookworm` + `pnpm@11.7.0` + `python3` | - | **仅手动触发** |
+| **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | **仅手动触发** |
+| **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | **仅手动触发** |
+| **codebuddy2api** | `ghcr.io/harveyjiang/codebuddy2api:latest` | [ShouZhuo0413/codebuddy2api](https://github.com/ShouZhuo0413/codebuddy2api) `main` | `FROM codebuddy2api-base` | `COPY core/ admin/`（纯 Python 无编译） | **仅手动触发** |
 | **workbuddy2api-panel** | `ghcr.io/harveyjiang/workbuddy2api-panel:latest` | [HarveyJiang/workbuddy2api-panel](https://github.com/HarveyJiang/workbuddy2api-panel) `main` | 上游自带多阶段 Dockerfile（`golang:1.23-alpine` → `alpine:3.20`），镜像侧不维护副本 | `go build` 4 个二进制（server/signin/login/credit） | **仅手动触发** |
 
 **缓存策略：** `Base` 用 `registry:cache`，`App` 用 `registry+gha` 双缓存。仅改基础包时 `App` 30s 内完成（`build:web` 命中）；`web` 未变更时增量 vite；上游无更新则 `skip`。
@@ -145,7 +145,7 @@ docker compose up -d
 
 ### 工厂统一约定
 
-- 所有 `compose.yml` 使用 `ghcr.io/harveyjiang/<image>:latest`，每周自动更新
+- 所有 `compose.yml` 使用 `ghcr.io/harveyjiang/<image>:latest`；升级需手动构建并改 tag
 - 持久化卷统一 `./data/<name>`，`extra_hosts: host.docker.internal` 支持宿主机 MySQL（如 `10.0.0.166:3306`）
 - 健康检查 `curl -f http://localhost:3000` 已内置
 
@@ -213,7 +213,7 @@ git push
 ## ⏰ 巡检规则
 
 - **Base 层**：`push` 触发 `paths: [images/<name>/Dockerfile.base]` + `schedule: '0 2 * * 1'` + `workflow_dispatch`
-- **App 层**：`schedule: '0 3 * * 1'` 先 `git ls-remote` 上游，对比 `LAST_BUILD*`，无变更 `skip`，有变更则 `clone → cp Dockerfile → build-push`
+- **App 层**：手动触发时先 `git ls-remote` 上游，对比 `LAST_BUILD*`，无变更 `skip`，有变更则 `clone → cp Dockerfile → build-push`
 
 ---
 

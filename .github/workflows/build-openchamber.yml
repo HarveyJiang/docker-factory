@@ -1,16 +1,7 @@
 name: build-openchamber
 
 on:
-  push:
-    paths:
-      - "images/openchamber/Dockerfile"
-      - ".github/workflows/build-openchamber.yml"
-    branches: [main]
-  # base 构建成功后自动跟进，把新 base 吃进来
-  workflow_run:
-    workflows: ["build-openchamber-base"]
-    types: [completed]
-    branches: [main]
+  # 用户要求：全部构建改为手动触发，不再随 base 构建自动跟进。
   workflow_dispatch:
     inputs:
       force:

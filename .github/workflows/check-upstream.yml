@@ -1,14 +1,13 @@
 name: check-upstream
 
-# 事件驱动：每天查一次上游，有新版本才触发构建，不再定时空转。
-#   - @opencode/cli 出新版 -> 触发 build-openchamber-base
-#   - btriapitsyn/openchamber 出新 release -> 触发 build-openchamber
-#   - base 构建成功后，app 通过 workflow_run 自动跟着重建（吃到新 base）
-# 已查过的版本记在 .upstream.json，避免重复触发。
+# 只手动跑：查询上游 opencode/openchamber 版本，与 .upstream.json 比对，
+# 把查询结果打印出来供人工判断是否需要构建。
+# 不再自动触发任何构建 workflow（用户要求全部手动）。
+# 注意：本 workflow 只做「查版本」并更新 .upstream.json，构建请手动跑
+# build-openchamber-base / build-openchamber。
+# 已查过的版本记在 .upstream.json，避免重复提示。
 
 on:
-  schedule:
-    - cron: '0 1 * * *'  # 每天 01:00 UTC 查一次
   workflow_dispatch:
 
 permissions:
@@ -42,6 +41,7 @@ jobs:
             fi
           fi
           echo "latest=$latest" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "build=$build" >> "$GITHUB_OUTPUT"
       - name: Check upstream openchamber release
         id: app
@@ -62,28 +62,19 @@ jobs:
             fi
           fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "current=$current" >> "$GITHUB_OUTPUT"
           echo "build=$build" >> "$GITHUB_OUTPUT"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Trigger builds
+      - name: Summary (build manually if needed)
         run: |
-          [ "${{ steps.opencode.outputs.build }}" = "true" ] && gh workflow run build-openchamber-base.yml --ref main && echo "base 构建已触发"
-          [ "${{ steps.app.outputs.build }}" = "true" ] && gh workflow run build-openchamber.yml --ref main && echo "app 构建已触发"
-          [ "${{ steps.opencode.outputs.build }}" = "true" ] || [ "${{ steps.app.outputs.build }}" = "true" ] || echo "上游无变化，跳过"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Record tracked versions
-        if: steps.opencode.outputs.build == 'true' || steps.app.outputs.build == 'true'
-        run: |
-          cli="${{ steps.opencode.outputs.latest }}"
-          tag="${{ steps.app.outputs.tag }}"
-          [ -z "$cli" ] && cli="$(jq -r '.opencode_cli // empty' .upstream.json)"
-          [ -z "$tag" ] && tag="$(jq -r '.openchamber_release // empty' .upstream.json)"
-          jq -n --arg cli "$cli" --arg rel "$tag" '{opencode_cli: $cli, openchamber_release: $rel}' > .upstream.json
-          cat .upstream.json
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add .upstream.json
-          git commit -m "chore: track upstream opencode@$cli openchamber@$tag" || true
-          git pull --rebase origin main || true
-          git push || echo "push race, next run will retry"
+          {
+            echo "### 上游版本检查（仅查询，不自动构建）"
+            echo ""
+            echo "| 组件 | 上游最新 | 记录中 | 需构建 |"
+            echo "|---|---|---|---|"
+            echo "| @opencode/cli | ${{ steps.opencode.outputs.latest }} | ${{ steps.opencode.outputs.current }} | ${{ steps.opencode.outputs.build }} |"
+            echo "| btriapitsyn/openchamber | ${{ steps.app.outputs.tag }} | ${{ steps.app.outputs.current }} | ${{ steps.app.outputs.build }} |"
+            echo ""
+            echo "需要构建时，请手动触发对应 workflow。"
+          } >> "$GITHUB_STEP_SUMMARY"

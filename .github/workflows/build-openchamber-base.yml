@@ -1,11 +1,8 @@
 name: build-openchamber-base
 
 on:
-  push:
-    paths:
-      - "images/openchamber/Dockerfile.base"
-      - ".github/workflows/build-openchamber-base.yml"
-    branches: [main]
+  # 用户要求：全部构建改为手动触发。base 改完需手动跑本 workflow，
+  # 再手动跑 build-openchamber（已不再自动跟进）。
   workflow_dispatch:
     inputs:
       opencode_version:

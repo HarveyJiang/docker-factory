@@ -1,13 +1,7 @@
 name: build-codebuddy2api
 
 on:
-  schedule:
-    - cron: '0 3 * * 1'  # 每周一 03:00 UTC
-  push:
-    paths:
-      - "images/codebuddy2api/Dockerfile"
-      - ".github/workflows/build-codebuddy2api.yml"
-    branches: [main]
+  # 用户要求：全部构建改为手动触发，不做自动/定时构建。
   workflow_dispatch:
     inputs:
       force:
