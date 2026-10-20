@@ -1,7 +1,11 @@
 name: build-openchamber
 
 on:
-  # 用户要求：全部构建改为手动触发，不再随 base 构建自动跟进。
+  # base 构建成功后自动跟进，把新 base 吃进来（base 本身仍是手动触发）。
+  workflow_run:
+    workflows: ["build-openchamber-base"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       force:
