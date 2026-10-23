@@ -7,6 +7,7 @@ WORKDIR /home/openchamber
 
 # 1. 系统包 + Java/Maven/Python
 # trixie 已无 openjdk-17，使用 21 (兼容 17，且为当前 LTS)
+# openjdk-21-jdk-headless: 服务器无图形环境，砍 AWT/Swing 图形库，体积更小
 RUN apt-get update && apt-get install -y --no-install-recommends \
   bash \
   bzip2 \
@@ -27,7 +28,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   xz-utils \
   zip \
   zstd \
-  openjdk-21-jdk \
+  openjdk-21-jdk-headless \
   maven \
   && java -version && mvn -version \
   && rm -rf /var/lib/apt/lists/*
@@ -67,10 +68,14 @@ ENV WRANGLER_CACHE_DIR=/home/openchamber/.config/.wrangler/cache
 # opencode 跟随上游最新版：版本号由 CI 经 OPENCODE_VERSION 传进来，
 # 本地构建不传参时默认 latest。版本变化会自动使该层缓存失效重装，
 # 上游没发版则命中缓存，不浪费构建时间。
+# 仅保留当前平台（arm64）的二进制，删掉多余的 musl 平台包，省 ~200MB。
 ARG OPENCODE_VERSION=latest
 RUN npm config set prefix /home/openchamber/.npm-global && mkdir -p /home/openchamber/.npm-global && \
   mkdir -p /home/openchamber/.local /home/openchamber/.config /home/openchamber/.ssh && \
   npm install -g --cache /tmp/npm-cache @opencode/cli@${OPENCODE_VERSION} wrangler && \
+  # 只保留与基础镜像 glibc 匹配的 arm64 二进制，删除 musl 等多余平台包
+  find /home/openchamber/.npm-global/lib/node_modules/@opencode/cli/node_modules/@opencode \
+    -mindepth 1 -maxdepth 1 -type d ! -name "cli-linux-arm64" -exec rm -rf {} + && \
   npm ls -g @opencode/cli && \
   rm -rf /tmp/npm-cache /home/openchamber/.npm
 

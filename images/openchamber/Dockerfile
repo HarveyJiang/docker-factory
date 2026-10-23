@@ -45,7 +45,22 @@ COPY packages/sdk/examples/hello-kit/package.json ./packages/sdk/examples/hello-
 COPY packages/sdk/examples/service-echo/package.json ./packages/sdk/examples/service-echo/
 COPY packages/sdk/examples/tasks-demo/package.json ./packages/sdk/examples/tasks-demo/
 COPY packages/sdk/examples/tools-only/package.json ./packages/sdk/examples/tools-only/
-RUN bun install --frozen-lockfile --ignore-scripts --production
+RUN bun install --frozen-lockfile --ignore-scripts --production \
+  && rm -rf \
+    node_modules/onnxruntime-node \
+    node_modules/onnxruntime-web \
+    node_modules/onnxruntime-common \
+    node_modules/onnx-proto \
+    node_modules/@xenova \
+    node_modules/sherpa-onnx-node \
+    node_modules/sherpa-onnx-linux-arm64 \
+    node_modules/.bun/install/cache/onnxruntime-node@* \
+    node_modules/.bun/install/cache/onnxruntime-web@* \
+    node_modules/.bun/install/cache/onnxruntime-common@* \
+    node_modules/.bun/install/cache/onnx-proto@* \
+    node_modules/.bun/install/cache/@xenova+* \
+    node_modules/.bun/install/cache/sherpa-onnx-node@* \
+    node_modules/.bun/install/cache/sherpa-onnx-linux-arm64@*
 
 # Builder: 只在本机架构(BUILDPLATFORM, GitHub runner 为 amd64)上构建一次。
 # vite build 输出是纯前端静态文件(dist) 跨平台一致, 无需在 arm64/qemu 上重复编译,
