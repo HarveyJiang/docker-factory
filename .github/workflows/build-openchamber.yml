@@ -101,21 +101,6 @@ jobs:
             echo "Image $IMAGE Size: $SIZE"
           done
           docker buildx imagetools inspect "${{ env.IMAGE }}:${{ steps.date.outputs.date }}" 2>&1 | head -60 || true
-      - name: Save image to Artifacts
-        if: steps.check.outputs.skip == 'false'
-        run: |
-          IMAGE="${{ env.IMAGE }}:latest"
-          docker pull "$IMAGE" --quiet || true
-          docker save "$IMAGE" -o /tmp/image-latest.tar
-          ls -lh /tmp/image-latest.tar
-          echo "Saved $(du -h /tmp/image-latest.tar | cut -f1)"
-      - uses: actions/upload-artifact@v4
-        if: steps.check.outputs.skip == 'false'
-        with:
-          name: openchamber-${{ steps.date.outputs.date }}.tar
-          path: /tmp/image-latest.tar
-          retention-days: 3
-          compression-level: 0
       - name: Record last built SHA
         if: steps.check.outputs.skip == 'false'
         run: |

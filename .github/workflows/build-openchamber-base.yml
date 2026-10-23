@@ -68,16 +68,3 @@ jobs:
           echo "| \`$IMAGE\` | **$SIZE** |" >> $GITHUB_STEP_SUMMARY
           echo "Image $IMAGE Size: $SIZE"
           docker buildx imagetools inspect "$IMAGE" 2>&1 | head -60
-      - name: Save image to Artifacts
-        run: |
-          IMAGE="${{ env.IMAGE }}:latest"
-          docker pull "$IMAGE" --quiet || true
-          docker save "$IMAGE" -o /tmp/image.tar
-          ls -lh /tmp/image.tar
-          echo "Saved $(du -h /tmp/image.tar | cut -f1) to /tmp/image.tar"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: openchamber-base-${{ github.sha }}.tar
-          path: /tmp/image.tar
-          retention-days: 3
-          compression-level: 0
