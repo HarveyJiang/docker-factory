@@ -1,0 +1,28 @@
+name: mind-python
+
+services:
+  app:
+    image: ghcr.io/harveyjiang/mind-python:latest
+    container_name: mind-python
+    restart: unless-stopped
+    # 使用 host 网络模式：直接共享宿主机网络栈
+    # - WireGuard (wg0) 对容器透明，可直接访问远端数据库
+    # - 端口直接绑定宿主机，无需 ports 映射
+    network_mode: host
+    volumes:
+      - ./logs:/app/logs
+    env_file:
+      - .env
+    environment:
+      - TZ=Asia/Shanghai
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# 快速开始：
+#   cp images/mind-python/.env.example ./.env   # 修改 Redis/MySQL/MongoDB 连接
+#   docker compose up -d
+#   接口文档：http://127.0.0.1:8080/docs
+#   健康检查：http://127.0.0.1:8080/healthz

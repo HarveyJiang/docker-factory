@@ -23,6 +23,7 @@
 | **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | **仅手动触发** |
 | **codebuddy2api** | `ghcr.io/harveyjiang/codebuddy2api:latest` | [ShouZhuo0413/codebuddy2api](https://github.com/ShouZhuo0413/codebuddy2api) `main` | `FROM codebuddy2api-base` | `COPY core/ admin/`（纯 Python 无编译） | **仅手动触发** |
 | **workbuddy2api-panel** | `ghcr.io/harveyjiang/workbuddy2api-panel:latest` | [HarveyJiang/workbuddy2api-panel](https://github.com/HarveyJiang/workbuddy2api-panel) `main` | 上游自带多阶段 Dockerfile（`golang:1.23-alpine` → `alpine:3.20`），镜像侧不维护副本 | `go build` 4 个二进制（server/signin/login/credit） | **仅手动触发** |
+| **mind-python** | `ghcr.io/harveyjiang/mind-python:latest` | [HarveyJiang/mind-python](https://github.com/HarveyJiang/mind-python) `master` | `images/mind-python/Dockerfile` `python:3.13-slim` + `build-essential/nodejs` + `uv pip install -r requirements.txt` | `COPY .` + 多端口 uvicorn（3040/3050/8080 各 2 worker） | **仅手动触发** |
 
 **缓存策略：** `Base` 用 `registry:cache`，`App` 用 `registry+gha` 双缓存。仅改基础包时 `App` 30s 内完成（`build:web` 命中）；`web` 未变更时增量 vite；上游无更新则 `skip`。
 
@@ -55,6 +56,13 @@ docker run -d -p 127.0.0.1:7863:7863 \
   -v ./auths:/app/auths -v ./data:/app/data \
   ghcr.io/harveyjiang/workbuddy2api-panel
 # 面板 http://127.0.0.1:7863/healthz
+
+# mind-python (金融数据接口与爬虫服务，FastAPI)
+docker pull ghcr.io/harveyjiang/mind-python:latest
+docker run -d --network host --env-file .env \
+  -v ./logs:/app/logs \
+  ghcr.io/harveyjiang/mind-python
+# 接口文档 http://127.0.0.1:8080/docs  健康检查 http://127.0.0.1:8080/healthz
 ```
 
 ---
@@ -172,6 +180,10 @@ docker-factory/
 │   └── workbuddy2api-panel/
 │       ├── compose.yml        # 部署用，Dockerfile 直接用上游自带的多阶段文件
 │       └── config.example.json
+│   └── mind-python/
+│       ├── Dockerfile        # 单阶段：python:3.13-slim + 系统依赖 + uv 装 requirements.txt
+│       ├── compose.yml       # host 网络 + 多端口（3040/3050/8080）
+│       └── .env.example
 ├── .github/workflows/
 │   ├── build-openchamber-base.yml
 │   ├── build-openchamber.yml
@@ -179,8 +191,9 @@ docker-factory/
 │   ├── build-deepseek-harness.yml
 │   ├── build-codebuddy2api-base.yml
 │   ├── build-codebuddy2api.yml
-│   └── build-workbuddy2api-panel.yml
-└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>","codebuddy2api":"<sha>","workbuddy2api-panel":"<sha>"}
+│   ├── build-workbuddy2api-panel.yml
+│   └── build-mind-python.yml
+└── LAST_BUILDS.json          # {"openchamber":"<sha>","deepseek-harness":"<sha>","codebuddy2api":"<sha>","workbuddy2api-panel":"<sha>","mind-python":"<sha>"}
 ```
 
 ---
