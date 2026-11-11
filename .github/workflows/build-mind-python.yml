@@ -31,7 +31,7 @@ jobs:
         run: |
           # 私有仓库需要 PAT；公开仓库 PAT 为空时走匿名
           if [ -n "$GH_PAT" ]; then
-            url="https://x-access-token:${GH_PAT}@github.com/HarveyJiang/mind-python.git"
+            url="https://HarveyJiang:${GH_PAT}@github.com/HarveyJiang/mind-python.git"
           else
             url="$UPSTREAM_REPO"
           fi
@@ -54,7 +54,7 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
         run: |
           if [ -n "$GH_PAT" ]; then
-            url="https://x-access-token:${GH_PAT}@github.com/HarveyJiang/mind-python.git"
+            url="https://HarveyJiang:${GH_PAT}@github.com/HarveyJiang/mind-python.git"
           else
             url="$UPSTREAM_REPO"
           fi
