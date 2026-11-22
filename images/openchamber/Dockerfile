@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.6
 # openchamber 单镜像多阶段构建
 # - deps/prod-deps/builder：用 oven/bun 装依赖并构建（builder 在 BUILDPLATFORM 上跑，避免 QEMU 重复编译）
-# - runtime：内联系统依赖（Java/Maven/Python/Node/gh/cloudflared）+ 只拷贝构建产物
+# - runtime：内联系统依赖（Java/Maven/Python/Node/gh）+ 只拷贝构建产物
 # bun 1.4.5 对齐上游 packageManager bun@1.4.5
 
 # ---------- 依赖安装 ----------
@@ -39,13 +39,30 @@ RUN bun install --frozen-lockfile --ignore-scripts --production \
     node_modules/@xenova \
     node_modules/sherpa-onnx-node \
     node_modules/sherpa-onnx-linux-arm64 \
+    node_modules/@napi-rs/canvas-linux-arm64-musl \
     node_modules/.bun/install/cache/onnxruntime-node@* \
     node_modules/.bun/install/cache/onnxruntime-web@* \
     node_modules/.bun/install/cache/onnxruntime-common@* \
     node_modules/.bun/install/cache/onnx-proto@* \
     node_modules/.bun/install/cache/@xenova+* \
     node_modules/.bun/install/cache/sherpa-onnx-node@* \
-    node_modules/.bun/install/cache/sherpa-onnx-linux-arm64@*
+    node_modules/.bun/install/cache/sherpa-onnx-linux-arm64@* \
+    node_modules/.bun/install/cache/@napi-rs+canvas-linux-arm64-musl@* \
+    node_modules/.bun/@napi-rs+canvas-linux-arm64-musl@* \
+  # 只保留当前平台（linux-arm64）的原生二进制，其余平台都是死重
+  && rm -rf \
+    node_modules/.bun/7zip-bin@*/node_modules/7zip-bin/mac \
+    node_modules/.bun/7zip-bin@*/node_modules/7zip-bin/win \
+    node_modules/.bun/7zip-bin@*/node_modules/7zip-bin/linux/ia32 \
+    node_modules/.bun/7zip-bin@*/node_modules/7zip-bin/linux/x64 \
+    node_modules/.bun/7zip-bin@*/node_modules/7zip-bin/linux/arm \
+    node_modules/.bun/node-pty@*/node_modules/node-pty/prebuilds/win32-x64 \
+    node_modules/.bun/node-pty@*/node_modules/node-pty/prebuilds/win32-arm64 \
+    node_modules/.bun/node-pty@*/node_modules/node-pty/prebuilds/darwin-arm64 \
+    node_modules/.bun/node-pty@*/node_modules/node-pty/prebuilds/darwin-x64 \
+    node_modules/.bun/node-pty@*/node_modules/node-pty/prebuilds/linux-x64 \
+  # sql.js 的 debug wasm/js 生产运行用不到
+  && find node_modules/.bun/sql.js@* -name '*debug*' -delete 2>/dev/null || true
 
 # Builder: 只在本机架构(BUILDPLATFORM, GitHub runner 为 amd64)上构建一次。
 # vite/server 构建输出跨平台一致，无需在 arm64/qemu 上重复编译，省一半+构建时间。
@@ -112,7 +129,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   openjdk-21-jdk-headless \
   maven \
   && java -version && mvn -version \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get clean \
+  && rm -rf /var/cache/apt/archives/*.deb \
+  && find /usr/share/locale -mindepth 1 -maxdepth 1 -type d ! -name 'en*' ! -name 'zh*' -exec rm -rf {} + \
+  && rm -rf /usr/share/doc/* /usr/share/man/* /usr/share/info/*
 
 # 2. GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -120,7 +141,9 @@ RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
   && chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg \
   && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
   && apt-get update && apt-get install -y --no-install-recommends gh \
-  && rm -rf /var/lib/apt/lists/*
+  && rm -rf /var/lib/apt/lists/* \
+  && apt-get clean \
+  && rm -rf /var/cache/apt/archives/*.deb
 
 # 3. Node.js LTS (wrangler 需要 >=22，上游 engines 要求 >=24.14)
 RUN node_ver="v24.19.0" \
@@ -128,6 +151,7 @@ RUN node_ver="v24.19.0" \
   && curl -fsSL -o /tmp/node.tar.gz "https://nodejs.org/dist/${node_ver}/node-${node_ver}-linux-${node_arch}.tar.gz" \
   && tar -xzf /tmp/node.tar.gz -C /usr/local --strip-components=1 \
   && rm -f /tmp/node.tar.gz \
+  && rm -rf /usr/local/include \
   && node --version && npm --version
 
 # 4. 时区 + 用户（替换基础镜像的 bun 用户，保留 UID 1000 以便挂载卷权限正确）
@@ -159,9 +183,6 @@ RUN npm config set prefix /home/openchamber/.npm-global && mkdir -p /home/opench
     -mindepth 1 -maxdepth 1 -type d ! -name "cli-linux-arm64" -exec rm -rf {} + && \
   npm ls -g @opencode/cli && \
   rm -rf /tmp/npm-cache /home/openchamber/.npm
-
-# 5. cloudflared
-COPY --from=cloudflare/cloudflared@sha256:6d91c121b803126f7a5344005d17a9324788fc09d305b6e2560ec6040a7ae283 /usr/local/bin/cloudflared /usr/local/bin/cloudflared
 
 ENV NODE_ENV=production
 # 基础镜像默认 POSIX locale，内建终端里 bash readline 会把多字节字符按字节拆开，
