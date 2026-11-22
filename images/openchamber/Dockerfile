@@ -8,7 +8,8 @@
 FROM oven/bun:1.4.5 AS base
 WORKDIR /app
 
-FROM base AS deps
+# workspace 清单：deps 与 prod-deps 共用同一层，避免重复 COPY
+FROM base AS manifests
 WORKDIR /app
 COPY package.json bun.lock ./
 COPY bun-patches ./bun-patches
@@ -18,22 +19,17 @@ COPY packages/electron/package.json ./packages/electron/
 COPY packages/vscode/package.json ./packages/vscode/
 COPY packages/mobile/package.json ./packages/mobile/
 COPY packages/sdk/package.json ./packages/sdk/
+
+FROM manifests AS deps
+WORKDIR /app
 RUN bun install --frozen-lockfile --ignore-scripts
 
 # Runtime production deps only. The full install pulls in devDependencies for
 # electron/vscode/mobile packages (electron-builder, vite, typescript, oxlint,
 # vsce-sign, ...) that are several hundred MB and never used at runtime.
-# Start fresh from base (no node_modules) so bun only installs production deps.
-FROM base AS prod-deps
+# Start fresh from manifests (no node_modules) so bun only installs production deps.
+FROM manifests AS prod-deps
 WORKDIR /app
-COPY package.json bun.lock ./
-COPY bun-patches ./bun-patches
-COPY packages/ui/package.json ./packages/ui/
-COPY packages/web/package.json ./packages/web/
-COPY packages/electron/package.json ./packages/electron/
-COPY packages/vscode/package.json ./packages/vscode/
-COPY packages/mobile/package.json ./packages/mobile/
-COPY packages/sdk/package.json ./packages/sdk/
 RUN bun install --frozen-lockfile --ignore-scripts --production \
   && rm -rf \
     node_modules/onnxruntime-node \
@@ -60,12 +56,18 @@ WORKDIR /app
 COPY . .
 # server 运行时 import @openchamber/sdk, 而 deps 安装用了 --ignore-scripts
 # 导致 root postinstall 未构建它, 需在此先构建出 dist 供 runtime 阶段拷贝
-RUN bun run --cwd packages/sdk build
-# build:web = build:server(打包 server+cli 进 packages/web/build) + vite(前端进 dist)
+# sdk 只保留运行时 JS，删掉类型声明
+RUN bun run --cwd packages/sdk build \
+  && find packages/sdk/dist -name '*.d.ts' -delete
+# build:web = build:server(tsc 编译 server+cli 到 packages/web/build) + vite(前端进 dist)
+# 上游 tsconfig.server.json 开了 declaration + sourceMap + inlineSources，
+# build/ 会带 .d.ts 与内嵌完整源码的 .map，运行时不需要，删掉显著减小体积
 RUN --mount=type=cache,target=/root/.cache \
     --mount=type=cache,target=/app/node_modules/.cache \
     --mount=type=cache,target=/app/packages/web/node_modules/.vite \
-    bun run build:web
+    bun run build:web \
+  && find packages/web/build -name '*.d.ts' -delete \
+  && find packages/web/build -name '*.map' -delete
 
 # ---------- 运行时 ----------
 FROM oven/bun:1.4.5 AS runtime
