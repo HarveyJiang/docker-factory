@@ -54,6 +54,15 @@ FROM --platform=$BUILDPLATFORM deps AS builder
 WORKDIR /app
 # 利用 BuildKit cache + 层缓存：web 未变更时直接命中缓存，变更时增量编译
 COPY . .
+
+# 只保留 en + zh-CN 两套界面语言（脚本见 images/openchamber/limit-i18n.mjs）。
+# 上游 store.ts 用 15 个动态 import 分别打包每种语言，vite 会为每种语言把 ~130 个
+# i18n 片段各切一遍（900KB 的 integrations-catalog 还会让 Babel 反复打印 deoptimise
+# 告警），构建时间与 dist 体积都随语言数线性放大。脚本把动态 import 收敛到 zh-CN，
+# LOCALES 只留 en/zh-CN（设置里的语言选择器随之只剩两项），其它语言回落到 en。
+COPY limit-i18n.mjs /tmp/limit-i18n.mjs
+RUN bun /tmp/limit-i18n.mjs
+
 # server 运行时 import @openchamber/sdk, 而 deps 安装用了 --ignore-scripts
 # 导致 root postinstall 未构建它, 需在此先构建出 dist 供 runtime 阶段拷贝
 # sdk 只保留运行时 JS，删掉类型声明

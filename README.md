@@ -229,9 +229,10 @@ git push
 ## 🔧 本地调试
 
 ```bash
-# 构建 openchamber（单镜像，多阶段；本地需先 clone 上游并放入 Dockerfile）
+# 构建 openchamber（单镜像，多阶段；本地需先 clone 上游并放入 Dockerfile 与构建期补丁脚本）
 git clone --depth 1 --branch main https://github.com/openchamber/openchamber.git /tmp/oc
 cp images/openchamber/Dockerfile /tmp/oc/Dockerfile
+cp images/openchamber/limit-i18n.mjs /tmp/oc/limit-i18n.mjs
 docker build -t ghcr.io/harveyjiang/openchamber:local /tmp/oc
 
 # 其他仍是 Base+App 双层的镜像（如 deepseek-harness / codebuddy2api）
