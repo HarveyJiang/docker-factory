@@ -2,7 +2,6 @@
 
 > 统一镜像工厂：一仓库多镜像，Base+App 双层 + 双缓存，**全部手动触发构建**
 
-[![build-openchamber-base](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber-base.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber-base.yml)
 [![build-openchamber](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-openchamber.yml)
 [![build-deepseek-harness-base](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness-base.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness-base.yml)
 [![build-deepseek-harness](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness.yml/badge.svg)](https://github.com/HarveyJiang/docker-factory/actions/workflows/build-deepseek-harness.yml)
@@ -16,8 +15,7 @@
 
 | 镜像 | GHCR | 上游 | 基础层 | 应用层 | 巡检 |
 |------|------|------|--------|--------|------|
-| **openchamber-base** | `ghcr.io/harveyjiang/openchamber-base:latest` | - | `images/openchamber/Dockerfile.base`<br>`oven/bun:1.3.14` + `openjdk-21/maven` + `python3/node24/gh/cloudflared` | - | **仅手动触发** |
-| **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [btriapitsyn/openchamber](https://github.com/btriapitsyn/openchamber) `main` | `FROM openchamber-base` | `bun install` + `build:web` (vite) | **仅手动触发** + base 成功后自动联动 |
+| **openchamber** | `ghcr.io/harveyjiang/openchamber:latest` | [openchamber/openchamber](https://github.com/openchamber/openchamber) `main` | `images/openchamber/Dockerfile`<br>单镜像多阶段：`oven/bun:1.4.5` + `openjdk-21/maven` + `python3/node24/gh/cloudflared` | `bun install` + `build:web`（vite + server 打包进 `packages/web/build`） | **仅手动触发** |
 | **deepseek-harness-base** | `ghcr.io/harveyjiang/deepseek-harness-base:latest` | - | `images/deepseek-harness/Dockerfile.base`<br>`node:24-bookworm` + `pnpm@11.7.0` + `python3` | - | **仅手动触发** |
 | **deepseek-harness** | `ghcr.io/harveyjiang/deepseek-harness:latest` | [deepseek-ai/deepseek-harness](https://github.com/deepseek-ai/deepseek-harness) `master` | `FROM deepseek-harness-base` | `pnpm install` + `pnpm run build` | **仅手动触发** |
 | **codebuddy2api-base** | `ghcr.io/harveyjiang/codebuddy2api-base:latest` | - | `images/codebuddy2api/Dockerfile.base` `python:3.12-slim` + FastAPI 依赖层 | - | **仅手动触发** |
@@ -93,7 +91,7 @@ docker compose logs -f
 # OH_MY_OPENCODE=true  OPENCODE_HOST=http://172.17.0.1:4096
 ```
 
-**对应源码：** `btriapitsyn/openchamber:docker-compose.yml` + `scripts/docker-entrypoint.sh`
+**对应源码：** `openchamber/openchamber:docker-compose.yml` + `scripts/docker-entrypoint.sh`
 
 ### DeepSeek Harness
 
@@ -165,8 +163,7 @@ docker compose up -d
 docker-factory/
 ├── images/
 │   ├── openchamber/
-│   │   ├── Dockerfile.base   # 重依赖，月级变更
-│   │   └── Dockerfile        # FROM base + builder cache (syntax 1.6)
+│   │   └── Dockerfile        # 单镜像多阶段：deps/prod-deps/builder + runtime 内联系统依赖
 │   └── deepseek-harness/
 │       ├── Dockerfile.base   # Node24+pnpm+Python
 │       └── Dockerfile        # FROM base + pnpm build
@@ -185,7 +182,6 @@ docker-factory/
 │       ├── compose.yml       # host 网络 + 多端口（3040/3050/8080）
 │       └── .env.example
 ├── .github/workflows/
-│   ├── build-openchamber-base.yml
 │   ├── build-openchamber.yml
 │   ├── build-deepseek-harness-base.yml
 │   ├── build-deepseek-harness.yml
@@ -233,11 +229,13 @@ git push
 ## 🔧 本地调试
 
 ```bash
-# 构建 base
-docker build -f images/openchamber/Dockerfile.base -t ghcr.io/harveyjiang/openchamber-base:local .
+# 构建 openchamber（单镜像，多阶段；本地需先 clone 上游并放入 Dockerfile）
+git clone --depth 1 --branch main https://github.com/openchamber/openchamber.git /tmp/oc
+cp images/openchamber/Dockerfile /tmp/oc/Dockerfile
+docker build -t ghcr.io/harveyjiang/openchamber:local /tmp/oc
 
-# 构建 app（需先有 base）
-docker build -f images/openchamber/Dockerfile -t ghcr.io/harveyjiang/openchamber:local --build-arg BASE_TAG=local .
+# 其他仍是 Base+App 双层的镜像（如 deepseek-harness / codebuddy2api）
+# 先构建 base，再构建 app
 ```
 
 ---
@@ -245,4 +243,5 @@ docker build -f images/openchamber/Dockerfile -t ghcr.io/harveyjiang/openchamber
 ## 📌 迁移说明
 
 - 2025-08-27: `openchamber-docker` → `docker-factory`，扁平 `Dockerfile` → `images/<name>/`
-- 旧镜像 `ghcr.io/harveyjiang/openchamber-docker` / `openchamber-docker-base` 仍保留，新镜像为 `.../openchamber` / `.../openchamber-base`
+- 旧镜像 `ghcr.io/harveyjiang/openchamber-docker` / `openchamber-docker-base` 仍保留，新镜像为 `.../openchamber`
+- 2026-11-22: openchamber 由 Base+App 双层合并为单镜像多阶段（base 只有它一个消费者，双层带来版本漂移与联动链路成本）

@@ -4,7 +4,7 @@ name: check-upstream
 # 把查询结果打印出来供人工判断是否需要构建。
 # 不再自动触发任何构建 workflow（用户要求全部手动）。
 # 注意：本 workflow 只做「查版本」并更新 .upstream.json，构建请手动跑
-# build-openchamber-base / build-openchamber。
+# build-openchamber。
 # 已查过的版本记在 .upstream.json，避免重复提示。
 
 on:
@@ -46,7 +46,7 @@ jobs:
       - name: Check upstream openchamber release
         id: app
         run: |
-          tag="$(gh api repos/btriapitsyn/openchamber/releases/latest --jq .tag_name)"
+          tag="$(gh api repos/openchamber/openchamber/releases/latest --jq .tag_name)"
           current="$(jq -r '.openchamber_release // empty' .upstream.json 2>/dev/null)"
           echo "tag=$tag current=$current"
           # 去掉前导 v 后比较：minor 策略比 major.minor，major 策略比 major
@@ -74,7 +74,7 @@ jobs:
             echo "| 组件 | 上游最新 | 记录中 | 需构建 |"
             echo "|---|---|---|---|"
             echo "| @opencode/cli | ${{ steps.opencode.outputs.latest }} | ${{ steps.opencode.outputs.current }} | ${{ steps.opencode.outputs.build }} |"
-            echo "| btriapitsyn/openchamber | ${{ steps.app.outputs.tag }} | ${{ steps.app.outputs.current }} | ${{ steps.app.outputs.build }} |"
+            echo "| openchamber/openchamber | ${{ steps.app.outputs.tag }} | ${{ steps.app.outputs.current }} | ${{ steps.app.outputs.build }} |"
             echo ""
             echo "需要构建时，请手动触发对应 workflow。"
           } >> "$GITHUB_STEP_SUMMARY"
